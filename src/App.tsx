@@ -32,6 +32,12 @@ maplibregl.setWorkerUrl(maplibreWorkerUrl)
 // entries are ignored, max 100 entries per type. `\|` / `\:` escape separators.
 // ---------------------------------------------------------------------------
 
+// Robustness caps for attacker-supplied URLs (self-DoS guard).
+const MAX_VALUE_CHARS = 20000
+const MAX_POINTS = 2000
+const MAX_SCALE = 5
+const MAX_RADIUS_M = 10_000_000
+
 type DrawMarker = {
   lat: number
   lng: number
@@ -126,7 +132,9 @@ function parseKV(item: string): Record<string, string> {
     const idx = part.indexOf(':')
     if (idx <= 0) continue
     const key = part.slice(0, idx).trim()
-    rec[FIELD_ALIAS[key] ?? key] = part.slice(idx + 1)
+    const value = part.slice(idx + 1)
+    rec[FIELD_ALIAS[key] ?? key] =
+      value.length > MAX_VALUE_CHARS ? value.slice(0, MAX_VALUE_CHARS) : value
   }
   return rec
 }
@@ -158,6 +166,7 @@ function parsePts(s: string | undefined): Array<[number, number]> | undefined {
   if (!s) return undefined
   const pts: Array<[number, number]> = []
   for (const chunk of splitEscaped(s, ';')) {
+    if (pts.length >= MAX_POINTS) break
     const [latRaw, lngRaw] = chunk.split(',')
     const ll = latLng(latRaw?.trim(), lngRaw?.trim())
     if (ll) pts.push([ll.lng, ll.lat])
@@ -174,7 +183,7 @@ function parseMarker(item: string): DrawMarker | undefined {
   if (kv.emoji) m.emoji = kv.emoji
   if (kv.color) m.color = cssColor(kv.color)
   const scale = num(kv.scale)
-  if (scale !== undefined && scale > 0) m.scale = scale
+  if (scale !== undefined && scale > 0) m.scale = Math.min(scale, MAX_SCALE)
   if (kv.anchor && ANCHORS.has(kv.anchor)) {
     m.anchor = kv.anchor as DrawMarker['anchor']
   }
@@ -249,7 +258,7 @@ function parseCircle(item: string): DrawCircle | undefined {
   const ll = latLng(kv.lat, kv.lng)
   const radius = num(kv.radius)
   if (!ll || radius === undefined || radius <= 0) return undefined
-  const circle: DrawCircle = { lat: ll.lat, lng: ll.lng, radius }
+  const circle: DrawCircle = { lat: ll.lat, lng: ll.lng, radius: Math.min(radius, MAX_RADIUS_M) }
   if (kv.color) circle.color = cssColor(kv.color)
   const opacity = num(kv.opacity)
   if (opacity !== undefined && opacity >= 0 && opacity <= 1) circle.opacity = opacity
@@ -448,9 +457,12 @@ function markerElement(m: DrawMarker, fallbackText: string): HTMLDivElement {
   const s = m.scale ?? 1
   const size = Math.round(28 * s)
   el.style.cssText =
-    `width:${size}px;height:${size}px;border-radius:50%;background:${m.color ?? DEFAULTS.marker.color};color:#fff;` +
+    `width:${size}px;height:${size}px;border-radius:50%;color:#fff;` +
     `font:700 ${Math.round(14 * s)}px/${size}px system-ui,sans-serif;text-align:center;cursor:pointer;` +
     `border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);`
+  // Assigned as a property (never interpolated into cssText) so a crafted colour
+  // can't inject extra declarations; an invalid value is simply ignored.
+  el.style.background = m.color ?? DEFAULTS.marker.color
   return el
 }
 

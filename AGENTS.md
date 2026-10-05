@@ -29,6 +29,9 @@ data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.
   `:root` to a dark palette under `prefers-color-scheme: dark`. The panel and MapLibre
   popups (always white) must set explicit colours, or text goes light-on-white and
   disappears. Panel theme lives in `src/panel.css` as `--ml-*` variables.
+- **Never interpolate URL values into HTML/CSS strings**: popups are built with
+  `escapeHtml` and marker colours are applied via `style.background` (a property), not
+  `cssText`. Keep it that way so a crafted URL can't inject markup or CSS declarations.
 - **Import style**: `import * as maplibregl from 'maplibre-gl'` — there is no default
   export (`TS1192` if you "fix" it).
 - **StrictMode double-mount** (`src/main.tsx`): the map effect runs twice in dev. Map,
