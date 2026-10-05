@@ -10,9 +10,13 @@ data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.
 
 ## Gotchas (all hit before — don't regress)
 
-- **MapLibre worker**: v6 resolves its worker via `import.meta.url`, which breaks under
-  Vite. Keep the `?url` worker import + `maplibregl.setWorkerUrl(...)` at the top of
-  `src/App.tsx`. Symptom of regression: "Worker failed to load" in console.
+- **MapLibre worker**: v6 resolves its worker via `import.meta.url` and its worker
+  statically imports `maplibre-gl-shared.mjs`. Keep the `?worker&url` worker import +
+  `maplibregl.setWorkerUrl(...)` at the top of `src/App.tsx`, **and** `worker.format:
+  'es'` in `vite.config.ts`. A plain `?url` import copies the worker but drops the shared
+  chunk (Vite never emits it), so the browser 404s it. Symptoms: "Worker failed to load",
+  or "Expected a JavaScript-or-Wasm module script but the server responded with a MIME
+  type of text/html" for `/assets/maplibre-gl-shared.mjs`.
 - **Import style**: `import * as maplibregl from 'maplibre-gl'` — there is no default
   export (`TS1192` if you "fix" it).
 - **StrictMode double-mount** (`src/main.tsx`): the map effect runs twice in dev. Map,

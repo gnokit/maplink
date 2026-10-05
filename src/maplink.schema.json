@@ -2,7 +2,7 @@
   "name": "maplink",
   "schemaVersion": "1",
   "summary": "Full-screen MapLibre map defined entirely by the URL query string. Paste a link, get the same map — no backend, no API key.",
-  "baseUrl": "https://maplink.app",
+  "baseUrl": "https://maplink-five.vercel.app",
   "docs": {
     "llmsTxt": "/llms.txt",
     "llmsFullTxt": "/llms-full.txt",
