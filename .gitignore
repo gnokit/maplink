@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Generated agent docs (produced by `npm run gen:agent`)
+public/llms.txt
+public/llms-full.txt
+public/.well-known/

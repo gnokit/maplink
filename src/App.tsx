@@ -2,6 +2,15 @@ import { useEffect, useRef } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import {
+  ANCHORS,
+  DEFAULTS,
+  DEFAULT_CENTER,
+  DEFAULT_ZOOM,
+  DOM_MARKER_LIMIT,
+  MAX_PER_TYPE,
+  STYLES,
+} from './schema'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
@@ -71,26 +80,6 @@ type GJFeature = {
     | { type: 'Polygon'; coordinates: Array<Array<[number, number]>> }
   properties: Record<string, unknown>
 }
-
-const MAX_PER_TYPE = 100
-
-const STYLES: Record<string, string> = {
-  bright: 'https://tiles.openfreemap.org/styles/bright',
-  positron: 'https://tiles.openfreemap.org/styles/positron',
-  liberty: 'https://tiles.openfreemap.org/styles/liberty',
-}
-
-const ANCHORS = new Set([
-  'center',
-  'top',
-  'bottom',
-  'left',
-  'right',
-  'top-left',
-  'top-right',
-  'bottom-left',
-  'bottom-right',
-])
 
 function splitEscaped(s: string, sep: string): string[] {
   const out: string[] = []
@@ -390,7 +379,7 @@ function markerElement(m: DrawMarker, fallbackText: string): HTMLDivElement {
   const s = m.scale ?? 1
   const size = Math.round(28 * s)
   el.style.cssText =
-    `width:${size}px;height:${size}px;border-radius:50%;background:${m.color ?? '#2563eb'};color:#fff;` +
+    `width:${size}px;height:${size}px;border-radius:50%;background:${m.color ?? DEFAULTS.marker.color};color:#fff;` +
     `font:700 ${Math.round(14 * s)}px/${size}px system-ui,sans-serif;text-align:center;cursor:pointer;` +
     `border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);`
   return el
@@ -413,13 +402,13 @@ function App() {
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: draw.style,
-      center: draw.center ?? [114.1825, 22.3138],
-      zoom: draw.zoom ?? 14.5,
+      center: draw.center ?? DEFAULT_CENTER,
+      zoom: draw.zoom ?? DEFAULT_ZOOM,
     })
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
 
     // Markers + standalone popups don't depend on the style — add immediately.
-    const usePointsLayer = draw.markers.length > 50
+    const usePointsLayer = draw.markers.length > DOM_MARKER_LIMIT
     const markers: maplibregl.Marker[] = []
     if (!usePointsLayer) {
       draw.markers.forEach((m, i) => {
@@ -461,9 +450,9 @@ function App() {
           type: 'Feature',
           geometry: { type: 'LineString', coordinates: l.pts },
           properties: {
-            color: l.color ?? '#e11d48',
-            width: l.width ?? 4,
-            opacity: l.opacity ?? 1,
+            color: l.color ?? DEFAULTS.line.color,
+            width: l.width ?? DEFAULTS.line.width,
+            opacity: l.opacity ?? DEFAULTS.line.opacity,
             title: l.title ?? null,
             body: l.body ?? null,
           },
@@ -474,9 +463,9 @@ function App() {
           type: 'Feature',
           geometry: { type: 'Polygon', coordinates: [a.pts] },
           properties: {
-            color: a.color ?? '#2563eb',
-            opacity: a.opacity ?? 0.2,
-            outline: a.outline ?? a.color ?? '#2563eb',
+            color: a.color ?? DEFAULTS.area.color,
+            opacity: a.opacity ?? DEFAULTS.area.opacity,
+            outline: a.outline ?? a.color ?? DEFAULTS.area.color,
             title: a.title ?? null,
             body: a.body ?? null,
           },
@@ -487,9 +476,9 @@ function App() {
           type: 'Feature',
           geometry: { type: 'Polygon', coordinates: [circleRing(c.lng, c.lat, c.radius)] },
           properties: {
-            color: c.color ?? '#16a34a',
-            opacity: c.opacity ?? 0.2,
-            outline: c.color ?? '#16a34a',
+            color: c.color ?? DEFAULTS.circle.color,
+            opacity: c.opacity ?? DEFAULTS.circle.opacity,
+            outline: c.color ?? DEFAULTS.circle.color,
             title: c.title ?? null,
             body: c.body ?? null,
           },
@@ -506,8 +495,8 @@ function App() {
           source: 'maplink-draw',
           filter: ['==', '$type', 'Polygon'],
           paint: {
-            'fill-color': ['coalesce', ['get', 'color'], '#2563eb'],
-            'fill-opacity': ['coalesce', ['get', 'opacity'], 0.2],
+            'fill-color': ['coalesce', ['get', 'color'], DEFAULTS.area.color],
+            'fill-opacity': ['coalesce', ['get', 'opacity'], DEFAULTS.area.opacity],
           },
         })
         map.addLayer({
@@ -516,7 +505,7 @@ function App() {
           source: 'maplink-draw',
           filter: ['==', '$type', 'Polygon'],
           paint: {
-            'line-color': ['coalesce', ['get', 'outline'], '#2563eb'],
+            'line-color': ['coalesce', ['get', 'outline'], DEFAULTS.area.color],
             'line-width': 2,
           },
         })
@@ -526,9 +515,9 @@ function App() {
           source: 'maplink-draw',
           filter: ['==', '$type', 'LineString'],
           paint: {
-            'line-color': ['coalesce', ['get', 'color'], '#e11d48'],
-            'line-width': ['coalesce', ['get', 'width'], 4],
-            'line-opacity': ['coalesce', ['get', 'opacity'], 1],
+            'line-color': ['coalesce', ['get', 'color'], DEFAULTS.line.color],
+            'line-width': ['coalesce', ['get', 'width'], DEFAULTS.line.width],
+            'line-opacity': ['coalesce', ['get', 'opacity'], DEFAULTS.line.opacity],
           },
         })
         for (const layerId of ['maplink-area', 'maplink-line']) {
@@ -557,7 +546,7 @@ function App() {
               type: 'Feature',
               geometry: { type: 'Point', coordinates: [m.lng, m.lat] },
               properties: {
-                color: m.color ?? '#2563eb',
+                color: m.color ?? DEFAULTS.marker.color,
                 title: m.title ?? m.label ?? `Marker ${i + 1}`,
                 body: m.body ?? null,
               },
@@ -570,7 +559,7 @@ function App() {
           source: 'maplink-points',
           paint: {
             'circle-radius': 8,
-            'circle-color': ['coalesce', ['get', 'color'], '#2563eb'],
+            'circle-color': ['coalesce', ['get', 'color'], DEFAULTS.marker.color],
             'circle-stroke-color': '#fff',
             'circle-stroke-width': 2,
           },

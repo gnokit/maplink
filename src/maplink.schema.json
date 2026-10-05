@@ -1,0 +1,179 @@
+{
+  "name": "maplink",
+  "schemaVersion": "1",
+  "summary": "Full-screen MapLibre map defined entirely by the URL query string. Paste a link, get the same map — no backend, no API key.",
+  "baseUrl": "https://maplink.app",
+  "docs": {
+    "llmsTxt": "/llms.txt",
+    "llmsFullTxt": "/llms-full.txt",
+    "schema": "/.well-known/maplink.schema.json"
+  },
+  "encoding": {
+    "repeatable": "Each drawable parameter may appear multiple times — one object per occurrence.",
+    "fieldFormat": "Fields are key:value pairs joined by '|', in any order.",
+    "listSeparator": ";",
+    "escapes": {
+      "\\|": "literal '|'",
+      "\\:": "literal ':'"
+    },
+    "urlEncode": {
+      "#": "%23",
+      "\\n": "%0A"
+    },
+    "maxPerType": 100
+  },
+  "styles": {
+    "bright": "https://tiles.openfreemap.org/styles/bright",
+    "positron": "https://tiles.openfreemap.org/styles/positron",
+    "liberty": "https://tiles.openfreemap.org/styles/liberty"
+  },
+  "defaultStyle": "bright",
+  "domMarkerLimit": 50,
+  "enums": {
+    "style": ["bright", "positron", "liberty"],
+    "anchor": [
+      "center",
+      "top",
+      "bottom",
+      "left",
+      "right",
+      "top-left",
+      "top-right",
+      "bottom-left",
+      "bottom-right"
+    ]
+  },
+  "defaults": {
+    "marker": {
+      "color": "#2563eb",
+      "scale": 1,
+      "anchor": "center",
+      "offset": "0,0",
+      "rotation": 0,
+      "opacity": 1,
+      "drag": 0
+    },
+    "line": { "color": "#e11d48", "width": 4, "opacity": 1 },
+    "area": { "color": "#2563eb", "opacity": 0.2 },
+    "circle": { "color": "#16a34a", "opacity": 0.2 }
+  },
+  "view": {
+    "center": {
+      "syntax": "center={lat}|{lng}",
+      "default": [114.1825, 22.3138],
+      "notes": "Initial map center."
+    },
+    "zoom": {
+      "syntax": "zoom={n}",
+      "min": 0,
+      "max": 22,
+      "default": 14.5,
+      "notes": "Zoom level."
+    },
+    "style": {
+      "syntax": "style={bright|positron|liberty}",
+      "enum": ["bright", "positron", "liberty"],
+      "default": "bright",
+      "notes": "Basemap. Unknown values fall back to bright."
+    },
+    "autoFit": "If any drawables exist and neither center nor zoom is given, the map fits all of them."
+  },
+  "drawables": [
+    {
+      "id": "marker",
+      "key": "m",
+      "aliases": ["pin", "marker"],
+      "geometry": "Point",
+      "description": "A map marker with an optional click popup. Maps 1:1 to MapLibre MarkerOptions; label/emoji build the badge element.",
+      "required": ["lat", "lng"],
+      "example": "?m=lat:22.315203|lng:114.181846|label:1|emoji:🏢|color:%232563eb|title:何文田停車場|body:空位 30%0A限高 1.8 米",
+      "fields": [
+        { "key": "lat", "type": "number", "required": true },
+        { "key": "lng", "type": "number", "required": true },
+        { "key": "label", "type": "string", "notes": "Badge text." },
+        { "key": "emoji", "type": "string", "notes": "Badge glyph, used when there is no label." },
+        { "key": "color", "type": "CSS color", "default": "#2563eb", "notes": "Tints the badge." },
+        { "key": "scale", "type": "number > 0", "default": 1, "notes": "Badge size multiplier." },
+        { "key": "anchor", "type": "enum", "default": "center", "enum": ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"] },
+        { "key": "offset", "type": "x,y pixels", "default": "0,0", "notes": "Pixel offset from the point." },
+        { "key": "rotation", "type": "degrees", "default": 0 },
+        { "key": "opacity", "type": "number 0-1", "default": 1 },
+        { "key": "drag", "type": "0 | 1", "default": 0, "notes": "Allow dragging the pin. Also accepts true." },
+        { "key": "title", "type": "string", "notes": "Popup title." },
+        { "key": "body", "type": "string", "notes": "Popup body; \\n becomes a line break." }
+      ],
+      "notes": "Over the DOM marker limit, renders as a GPU circle layer instead of DOM pins (see domMarkerLimit)."
+    },
+    {
+      "id": "popup",
+      "key": "popup",
+      "aliases": [],
+      "geometry": "Point",
+      "description": "A standalone popup card with no marker under it.",
+      "required": ["lat", "lng"],
+      "example": "?popup=lat:22.3193|lng:114.1694|title:香港|body:維多利亞港以北",
+      "fields": [
+        { "key": "lat", "type": "number", "required": true },
+        { "key": "lng", "type": "number", "required": true },
+        { "key": "title", "type": "string", "notes": "At least one of title/body is required." },
+        { "key": "body", "type": "string", "notes": "At least one of title/body is required." }
+      ]
+    },
+    {
+      "id": "line",
+      "key": "line",
+      "aliases": [],
+      "geometry": "LineString",
+      "description": "A route or path rendered as a line layer.",
+      "required": ["pts"],
+      "example": "?line=pts:22.3152,114.1818;22.3131,114.1806|color:%23e11d48|width:4|title:步行 5 分鐘|body:何文田廣場 → 何文田體育館",
+      "fields": [
+        { "key": "pts", "type": "lat,lng list", "required": true, "notes": "Semicolon-separated lat,lng pairs. At least 2 points." },
+        { "key": "color", "type": "CSS color", "default": "#e11d48" },
+        { "key": "width", "type": "number", "default": 4, "notes": "Line width in pixels." },
+        { "key": "opacity", "type": "number 0-1", "default": 1 },
+        { "key": "title", "type": "string" },
+        { "key": "body", "type": "string" }
+      ]
+    },
+    {
+      "id": "area",
+      "key": "area",
+      "aliases": [],
+      "geometry": "Polygon",
+      "description": "A zone or boundary rendered as a fill plus an outline. The ring auto-closes.",
+      "required": ["pts"],
+      "example": "?area=pts:22.3120,114.1790;22.3120,114.1820;22.3100,114.1820;22.3100,114.1790|color:%232563eb|opacity:0.2|title:愛民邨範圍",
+      "fields": [
+        { "key": "pts", "type": "lat,lng list", "required": true, "notes": "Semicolon-separated lat,lng pairs." },
+        { "key": "color", "type": "CSS color", "default": "#2563eb", "notes": "Fill color." },
+        { "key": "opacity", "type": "number 0-1", "default": 0.2, "notes": "Fill opacity." },
+        { "key": "outline", "type": "CSS color", "default": "same as color", "notes": "Outline stroke." },
+        { "key": "title", "type": "string" },
+        { "key": "body", "type": "string" }
+      ]
+    },
+    {
+      "id": "circle",
+      "key": "circle",
+      "aliases": [],
+      "geometry": "Polygon",
+      "description": "A center plus a radius in meters, approximated as a 64-sided polygon (styled like an area).",
+      "required": ["lat", "lng", "radius"],
+      "example": "?circle=lat:22.315203|lng:114.181846|radius:500|color:%2316a34a|opacity:0.15|title:5 分鐘步行圈",
+      "fields": [
+        { "key": "lat", "type": "number", "required": true },
+        { "key": "lng", "type": "number", "required": true },
+        { "key": "radius", "type": "number (meters)", "required": true, "notes": "Must be greater than 0." },
+        { "key": "color", "type": "CSS color", "default": "#16a34a" },
+        { "key": "opacity", "type": "number 0-1", "default": 0.2 },
+        { "key": "title", "type": "string" },
+        { "key": "body", "type": "string" }
+      ]
+    }
+  ],
+  "sharedFieldNotes": {
+    "title": "Click-popup title. HTML-escaped.",
+    "body": "Click-popup body. HTML-escaped; newlines become line breaks."
+  }
+}

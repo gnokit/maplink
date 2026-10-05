@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gen:agent": "node scripts/gen-agent-docs.mjs",
+    "predev": "npm run gen:agent",
+    "prebuild": "npm run gen:agent"
   },
   "dependencies": {
     "maplibre-gl": "^6.12.0",

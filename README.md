@@ -207,8 +207,30 @@ sources / layers on map `load` with per-feature data-driven styling. `circleRing
 (a haversine destination) turns radius meters into polygon rings. Cleanup removes
 all markers, popups and layers on unmount — StrictMode-safe.
 
+The URL grammar and every default live in **`src/maplink.schema.json`**, imported by
+`src/App.tsx` via `src/schema.ts` so code and docs share one source of truth.
+
+## 🤖 For AI agents
+
+The deployed site serves machine-readable descriptions of the grammar, generated at
+build time from that same schema:
+
+| Resource | Path |
+| --- | --- |
+| Short index for LLMs | `/llms.txt` |
+| Full API reference (this README) | `/llms-full.txt` |
+| Machine-readable grammar | `/.well-known/maplink.schema.json` |
+
+Point an agent at `llms.txt`: it lists every drawable, its required fields and the
+encoding rules, then links to the schema for defaults. (`AGENTS.md` is different — it
+is for agents *editing this repo*, not for agents *using the app*.)
+
+These files are generated and git-ignored; regenerate with `npm run gen:agent`, which
+also runs automatically before `npm run dev` and `npm run build`.
+
 ## 🧱 Stack
 
 - **React 19** + **TypeScript** + **Vite 8**
 - **`maplibre-gl` v6** — worker bundled via a `?url` import + `setWorkerUrl`
 - **OpenFreeMap** vector tiles — no API key
+- **Vercel** — static deploy; `vercel.json` rewrites any path to `index.html`
