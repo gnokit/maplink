@@ -25,6 +25,10 @@ data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.
   must run in the effect cleanup (StrictMode) or the panel and marker highlights leak.
   When the panel is open, `fitBounds` uses `padding.left = 340` so markers aren't hidden
   under it, and GL group filtering needs `group` written into feature properties.
+- **Theming / global CSS**: `index.css` styles `h1,h2` with `var(--text-h)` and flips
+  `:root` to a dark palette under `prefers-color-scheme: dark`. The panel and MapLibre
+  popups (always white) must set explicit colours, or text goes light-on-white and
+  disappears. Panel theme lives in `src/panel.css` as `--ml-*` variables.
 - **Import style**: `import * as maplibregl from 'maplibre-gl'` — there is no default
   export (`TS1192` if you "fix" it).
 - **StrictMode double-mount** (`src/main.tsx`): the map effect runs twice in dev. Map,

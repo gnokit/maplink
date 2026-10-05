@@ -1,4 +1,44 @@
-/* Left overlay panel (Google-Maps-style place list). Scoped to .maplink-*. */
+/* Left overlay panel (Google-Maps-style place list) + light/dark theme.
+   The panel sets its own colours so it is immune to the global `:root`
+   colour-scheme in index.css (h1/h2 use var(--text-h), which flips to a light
+   colour in dark mode — that made the panel title invisible on a white card). */
+
+.maplink-panel,
+.maplink-toggle {
+  --ml-bg: #ffffff;
+  --ml-fg: #111827;
+  --ml-muted: #6b7280;
+  --ml-border: #e5e7eb;
+  --ml-control-bg: #f3f4f6;
+  --ml-control-fg: #111827;
+  --ml-chip-bg: #f3f4f6;
+  --ml-chip-fg: #374151;
+  --ml-chip-border: #d1d5db;
+  --ml-active-bg: #111827;
+  --ml-active-fg: #ffffff;
+  --ml-row-hover: #f3f4f6;
+  --ml-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+@media (prefers-color-scheme: dark) {
+  .maplink-panel,
+  .maplink-toggle {
+    --ml-bg: #1f2937;
+    --ml-fg: #f3f4f6;
+    --ml-muted: #9ca3af;
+    --ml-border: #374151;
+    --ml-control-bg: #374151;
+    --ml-control-fg: #f3f4f6;
+    --ml-chip-bg: #374151;
+    --ml-chip-fg: #e5e7eb;
+    --ml-chip-border: #4b5563;
+    --ml-active-bg: #f3f4f6;
+    --ml-active-fg: #111827;
+    --ml-row-hover: #374151;
+    --ml-shadow: 0 2px 16px rgba(0, 0, 0, 0.55);
+  }
+}
+
 .maplink-root {
   position: relative;
   width: 100vw;
@@ -28,12 +68,11 @@
   height: 40px;
   border: none;
   border-radius: 8px;
-  background: #fff;
-  color: #111827;
-  font-size: 18px;
-  line-height: 1;
+  background: var(--ml-bg);
+  color: var(--ml-fg);
+  font: 18px/1 system-ui, sans-serif;
   cursor: pointer;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--ml-shadow);
 }
 
 .maplink-panel {
@@ -45,12 +84,13 @@
   max-height: calc(100% - 20px);
   display: flex;
   flex-direction: column;
-  background: #fff;
-  color: #111827;
+  background: var(--ml-bg);
+  color: var(--ml-fg);
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--ml-shadow);
   font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
   overflow: hidden;
+  color-scheme: light dark;
   transform: translateX(calc(-100% - 14px));
   transition: transform 0.2s ease;
 }
@@ -69,8 +109,12 @@
 .maplink-panel__title {
   flex: 1;
   margin: 0;
+  color: var(--ml-fg);
+  font-family: inherit;
   font-size: 15px;
   font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: normal;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -82,10 +126,9 @@
   height: 30px;
   border: none;
   border-radius: 6px;
-  background: #f3f4f6;
-  color: #111827;
-  font-size: 15px;
-  line-height: 1;
+  background: var(--ml-control-bg);
+  color: var(--ml-control-fg);
+  font: 15px/1 system-ui, sans-serif;
   cursor: pointer;
 }
 
@@ -97,9 +140,9 @@
 }
 
 .maplink-chip {
-  border: 1px solid #d1d5db;
-  background: #f3f4f6;
-  color: #374151;
+  border: 1px solid var(--ml-chip-border);
+  background: var(--ml-chip-bg);
+  color: var(--ml-chip-fg);
   border-radius: 999px;
   padding: 4px 10px;
   font: inherit;
@@ -108,9 +151,9 @@
 }
 
 .maplink-chip[aria-pressed='true'] {
-  background: #111827;
-  border-color: #111827;
-  color: #fff;
+  background: var(--ml-active-bg);
+  border-color: var(--ml-active-bg);
+  color: var(--ml-active-fg);
 }
 
 .maplink-panel__list {
@@ -137,7 +180,7 @@
 
 .maplink-row:hover,
 .maplink-row[aria-current='true'] {
-  background: #f3f4f6;
+  background: var(--ml-row-hover);
 }
 
 .maplink-row__dot {
@@ -145,7 +188,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(128, 128, 128, 0.5);
 }
 
 .maplink-row__emoji {
@@ -169,7 +212,7 @@
 
 .maplink-row__sub {
   display: block;
-  color: #6b7280;
+  color: var(--ml-muted);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -179,7 +222,7 @@
 .maplink-row__trail {
   flex: none;
   font-weight: 700;
-  color: #374151;
+  color: var(--ml-fg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -188,9 +231,9 @@
   flex-wrap: wrap;
   gap: 8px 12px;
   padding: 10px 14px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--ml-border);
   font-size: 12px;
-  color: #374151;
+  color: var(--ml-fg);
 }
 
 .maplink-legend__item {
@@ -220,4 +263,15 @@
   .maplink-panel[data-open='true'] {
     transform: translateY(0);
   }
+}
+
+/* MapLibre popups are always white and set no text colour, so in dark mode they
+   would inherit the light `:root` colour and go invisible. Pin both popup text
+   and attribution text to dark-on-white. */
+.maplibregl-popup-content {
+  color: #111827;
+}
+
+.maplibregl-ctrl-attrib {
+  color: #111827;
 }
