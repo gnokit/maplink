@@ -233,4 +233,5 @@ also runs automatically before `npm run dev` and `npm run build`.
 - **React 19** + **TypeScript** + **Vite 8**
 - **`maplibre-gl` v6** — worker bundled via a `?url` import + `setWorkerUrl`
 - **OpenFreeMap** vector tiles — no API key
-- **Vercel** — static deploy; `vercel.json` rewrites any path to `index.html`
+- **Vercel** — static deploy; `vercel.json` rewrites app paths to `index.html`
+  (excluding `/assets/*` and `/.well-known/*`, so missing files 404 properly)

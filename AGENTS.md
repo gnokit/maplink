@@ -17,6 +17,10 @@ data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.
   chunk (Vite never emits it), so the browser 404s it. Symptoms: "Worker failed to load",
   or "Expected a JavaScript-or-Wasm module script but the server responded with a MIME
   type of text/html" for `/assets/maplibre-gl-shared.mjs`.
+- **Vercel SPA rewrite**: `vercel.json` rewrites app paths to `index.html` but excludes
+  `/assets/*` and `/.well-known/*`. Without that exclusion a missing asset returns
+  `index.html` with `200 text/html` instead of a 404 — the exact mask for the worker
+  MIME error above.
 - **Import style**: `import * as maplibregl from 'maplibre-gl'` — there is no default
   export (`TS1192` if you "fix" it).
 - **StrictMode double-mount** (`src/main.tsx`): the map effect runs twice in dev. Map,
