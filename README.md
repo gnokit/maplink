@@ -51,6 +51,31 @@ markers as a demo.
 - **Escaping** — write a literal separator as `\|` or `\:`. Popup text is HTML-escaped.
 - **Encoding** — non-ASCII just works; only `#` → `%23` and newline → `%0A` need hand-encoding.
 
+### Short field names
+
+Every drawable field has a one-letter alias, and hex colours may drop the `#`. Both
+spellings are accepted; AI agents should prefer the short form.
+
+| Long | Short | Long | Short |
+| --- | --- | --- | --- |
+| `lat` | `a` | `title` | `t` |
+| `lng` | `o` | `body` | `b` |
+| `label` | `l` | `group` | `g` |
+| `emoji` | `e` | `subtitle` | `s` |
+| `color` | `c` | `radius` | `r` |
+| `scale` | `z` | `pts` | `p` |
+| `anchor` | `k` | `width` | `w` |
+| `offset` | `f` | `outline` | `u` |
+| `rotation` | `q` | `opacity` | `y` |
+| `drag` | `d` | | |
+
+```text
+?m=a:22.315203|o:114.181846|l:30|e:🏢|c:2563eb|t:何文田停車場|g:停車場|b:空位 30
+```
+
+Top-level params (`m`, `popup`, `line`, `area`, `circle`, `title`, `panel`, `group`,
+`center`, `zoom`, `style`) are unchanged.
+
 ### Viewport
 
 ```text

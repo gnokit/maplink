@@ -14,3 +14,8 @@ export const DEFAULT_CENTER: [number, number] = [
   schema.view.center.default[1],
 ]
 export const DEFAULT_ZOOM: number = schema.view.zoom.default
+
+// Short→canonical field names, inverted from the schema's long→short map.
+export const FIELD_ALIAS: Record<string, string> = Object.fromEntries(
+  Object.entries(schema.fieldAliases).map(([long, short]) => [short, long]),
+)

@@ -9,6 +9,7 @@ import {
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
   DOM_MARKER_LIMIT,
+  FIELD_ALIAS,
   MAX_PER_TYPE,
   STYLES,
 } from './schema'
@@ -25,6 +26,8 @@ maplibregl.setWorkerUrl(maplibreWorkerUrl)
 //   circle=lat:{}|lng:{}|radius:{m}|color:{}|opacity:{}|title:{}|body:{}|group:{}|subtitle:{}
 //   center={lat}|{lng}  zoom={n}  style={bright|positron|liberty}
 //   title={panel heading}  panel={0|1}  group={initial chip}
+// Drawable fields also accept one-letter aliases (lat→a, lng→o, color→c, …) and
+// hex colours may omit '#' (c:2563eb). See FIELD_ALIAS + README "Short field names".
 // All drawable params are repeatable. Only listed keys are read, malformed
 // entries are ignored, max 100 entries per type. `\|` / `\:` escape separators.
 // ---------------------------------------------------------------------------
@@ -122,7 +125,8 @@ function parseKV(item: string): Record<string, string> {
   for (const part of splitEscaped(item, '|')) {
     const idx = part.indexOf(':')
     if (idx <= 0) continue
-    rec[part.slice(0, idx).trim()] = part.slice(idx + 1)
+    const key = part.slice(0, idx).trim()
+    rec[FIELD_ALIAS[key] ?? key] = part.slice(idx + 1)
   }
   return rec
 }
@@ -131,6 +135,12 @@ function num(v: string | undefined): number | undefined {
   if (v === undefined || v === '') return undefined
   const n = Number(v)
   return Number.isFinite(n) ? n : undefined
+}
+
+// Accept bare hex (`color:2563eb`) as shorthand for `#2563eb`.
+function cssColor(v: string | undefined): string | undefined {
+  if (!v) return undefined
+  return /^[0-9a-fA-F]{3,8}$/.test(v) ? `#${v}` : v
 }
 
 function latLng(
@@ -162,7 +172,7 @@ function parseMarker(item: string): DrawMarker | undefined {
   const m: DrawMarker = { lat: ll.lat, lng: ll.lng }
   if (kv.label) m.label = kv.label
   if (kv.emoji) m.emoji = kv.emoji
-  if (kv.color) m.color = kv.color
+  if (kv.color) m.color = cssColor(kv.color)
   const scale = num(kv.scale)
   if (scale !== undefined && scale > 0) m.scale = scale
   if (kv.anchor && ANCHORS.has(kv.anchor)) {
@@ -201,7 +211,7 @@ function parseLine(item: string): DrawLine | undefined {
   const pts = parsePts(kv.pts)
   if (!pts) return undefined
   const line: DrawLine = { pts }
-  if (kv.color) line.color = kv.color
+  if (kv.color) line.color = cssColor(kv.color)
   const width = num(kv.width)
   if (width !== undefined && width > 0) line.width = width
   const opacity = num(kv.opacity)
@@ -223,10 +233,10 @@ function parseArea(item: string): DrawArea | undefined {
     ring.push([ring[0][0], ring[0][1]])
   }
   const area: DrawArea = { pts: ring }
-  if (kv.color) area.color = kv.color
+  if (kv.color) area.color = cssColor(kv.color)
   const opacity = num(kv.opacity)
   if (opacity !== undefined && opacity >= 0 && opacity <= 1) area.opacity = opacity
-  if (kv.outline) area.outline = kv.outline
+  if (kv.outline) area.outline = cssColor(kv.outline)
   if (kv.title) area.title = kv.title
   if (kv.body) area.body = kv.body
   if (kv.group) area.group = kv.group
@@ -240,7 +250,7 @@ function parseCircle(item: string): DrawCircle | undefined {
   const radius = num(kv.radius)
   if (!ll || radius === undefined || radius <= 0) return undefined
   const circle: DrawCircle = { lat: ll.lat, lng: ll.lng, radius }
-  if (kv.color) circle.color = kv.color
+  if (kv.color) circle.color = cssColor(kv.color)
   const opacity = num(kv.opacity)
   if (opacity !== undefined && opacity >= 0 && opacity <= 1) circle.opacity = opacity
   if (kv.title) circle.title = kv.title

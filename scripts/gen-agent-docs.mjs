@@ -33,6 +33,10 @@ const drawableLines = schema.drawables
   .map((d) => `- \`${d.key}\`${aliasPart(d)} \u2014 ${d.description} Required: ${d.required.join(', ')}.`)
   .join('\n')
 
+const aliasLine = Object.entries(schema.fieldAliases)
+  .map(([long, short]) => `\`${long}\`\u2192\`${short}\``)
+  .join(', ')
+
 const escapeLines = Object.entries(enc.escapes)
   .map(([k, v]) => `- Write a literal separator as \`${k}\` (${v}).`)
   .join('\n')
@@ -50,6 +54,12 @@ Base URL: ${base}
 ## Drawables
 
 ${drawableLines}
+
+## Field aliases (preferred)
+
+Drawable fields accept one-letter aliases (long names still work). Hex colours may omit the leading \`#\`, e.g. \`c:2563eb\`.
+
+${aliasLine}
 
 ## View
 

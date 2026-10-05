@@ -20,7 +20,8 @@
       "#": "%23",
       "\\n": "%0A"
     },
-    "maxPerType": 100
+    "maxPerType": 100,
+    "colorHex": "Hex colours may omit the leading '#': write color:2563eb instead of color:%232563eb."
   },
   "styles": {
     "bright": "https://tiles.openfreemap.org/styles/bright",
@@ -29,6 +30,27 @@
   },
   "defaultStyle": "bright",
   "domMarkerLimit": 50,
+  "fieldAliases": {
+    "lat": "a",
+    "lng": "o",
+    "label": "l",
+    "emoji": "e",
+    "color": "c",
+    "scale": "z",
+    "anchor": "k",
+    "offset": "f",
+    "rotation": "q",
+    "opacity": "y",
+    "drag": "d",
+    "title": "t",
+    "body": "b",
+    "group": "g",
+    "subtitle": "s",
+    "radius": "r",
+    "pts": "p",
+    "width": "w",
+    "outline": "u"
+  },
   "enums": {
     "style": ["bright", "positron", "liberty"],
     "anchor": [
