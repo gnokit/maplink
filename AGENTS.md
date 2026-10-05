@@ -1,4 +1,4 @@
-# AGENTS.md — mapurl
+# AGENTS.md — maplink
 
 Single-page MapLibre map (React 19 + TS + Vite 8) where the URL query string is the
 data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.

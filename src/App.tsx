@@ -496,14 +496,14 @@ function App() {
         })
       }
       if (features.length > 0) {
-        map.addSource('mapurl-draw', {
+        map.addSource('maplink-draw', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features },
         })
         map.addLayer({
-          id: 'mapurl-area',
+          id: 'maplink-area',
           type: 'fill',
-          source: 'mapurl-draw',
+          source: 'maplink-draw',
           filter: ['==', '$type', 'Polygon'],
           paint: {
             'fill-color': ['coalesce', ['get', 'color'], '#2563eb'],
@@ -511,9 +511,9 @@ function App() {
           },
         })
         map.addLayer({
-          id: 'mapurl-area-outline',
+          id: 'maplink-area-outline',
           type: 'line',
-          source: 'mapurl-draw',
+          source: 'maplink-draw',
           filter: ['==', '$type', 'Polygon'],
           paint: {
             'line-color': ['coalesce', ['get', 'outline'], '#2563eb'],
@@ -521,9 +521,9 @@ function App() {
           },
         })
         map.addLayer({
-          id: 'mapurl-line',
+          id: 'maplink-line',
           type: 'line',
-          source: 'mapurl-draw',
+          source: 'maplink-draw',
           filter: ['==', '$type', 'LineString'],
           paint: {
             'line-color': ['coalesce', ['get', 'color'], '#e11d48'],
@@ -531,7 +531,7 @@ function App() {
             'line-opacity': ['coalesce', ['get', 'opacity'], 1],
           },
         })
-        for (const layerId of ['mapurl-area', 'mapurl-line']) {
+        for (const layerId of ['maplink-area', 'maplink-line']) {
           map.on('click', layerId, (e) => {
             const f = e.features?.[0]
             if (!f) return
@@ -549,7 +549,7 @@ function App() {
 
       // >50 markers render as a GL circle layer instead of DOM nodes.
       if (usePointsLayer) {
-        map.addSource('mapurl-points', {
+        map.addSource('maplink-points', {
           type: 'geojson',
           data: {
             type: 'FeatureCollection',
@@ -565,9 +565,9 @@ function App() {
           },
         })
         map.addLayer({
-          id: 'mapurl-points',
+          id: 'maplink-points',
           type: 'circle',
-          source: 'mapurl-points',
+          source: 'maplink-points',
           paint: {
             'circle-radius': 8,
             'circle-color': ['coalesce', ['get', 'color'], '#2563eb'],
@@ -575,7 +575,7 @@ function App() {
             'circle-stroke-width': 2,
           },
         })
-        map.on('click', 'mapurl-points', (e) => {
+        map.on('click', 'maplink-points', (e) => {
           const f = e.features?.[0]
           if (!f) return
           const html = featurePopupHtml(f)
