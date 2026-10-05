@@ -66,6 +66,30 @@ center={lat}|{lng}   zoom={0–22}   style={bright|positron|liberty}
 If drawables exist and no `center` / `zoom` is given, the map **auto-fits
 everything**.
 
+### Panel
+
+An optional left-hand **list of everything on the map** (markers, popups, lines,
+areas, circles) so you can tell what's what and jump to it.
+
+```text
+title={panel heading}   panel={0|1}   group={initial chip}
+```
+
+| Param | Meaning | Default |
+| --- | --- | --- |
+| `title` | Panel heading | none |
+| `panel` | Force the panel open (`1`) or closed (`0`) | open when any drawable has `title` or `group` |
+| `group` | Category chip selected on load | 全部 (All) |
+
+Every drawable also accepts two panel fields:
+
+- `group` — category; chips are built from the distinct values (first-seen order) and selecting a chip filters **both the list and the map**.
+- `subtitle` — second line in the list; defaults to the first line of `body`.
+
+Clicking a row flies to the item and opens its popup; the ☰ button collapses the
+panel. Below 640px the panel becomes a bottom sheet. Links whose drawables carry
+no `title`/`group` stay chrome-free — no panel at all.
+
 ---
 
 ### 1. Markers — `m` (alias `pin`, `marker`)

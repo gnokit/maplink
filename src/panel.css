@@ -1,0 +1,223 @@
+/* Left overlay panel (Google-Maps-style place list). Scoped to .maplink-*. */
+.maplink-root {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.maplink-map {
+  position: absolute;
+  inset: 0;
+}
+
+.maplink-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Floating open button (visible only when the panel is closed). */
+.maplink-toggle {
+  pointer-events: auto;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
+.maplink-panel {
+  pointer-events: auto;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 320px;
+  max-height: calc(100% - 20px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #111827;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  overflow: hidden;
+  transform: translateX(calc(-100% - 14px));
+  transition: transform 0.2s ease;
+}
+
+.maplink-panel[data-open='true'] {
+  transform: translateX(0);
+}
+
+.maplink-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 8px;
+}
+
+.maplink-panel__title {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.maplink-panel__close {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: #f3f4f6;
+  color: #111827;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.maplink-panel__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 10px;
+}
+
+.maplink-chip {
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.maplink-chip[aria-pressed='true'] {
+  background: #111827;
+  border-color: #111827;
+  color: #fff;
+}
+
+.maplink-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 6px 8px;
+  overflow-y: auto;
+}
+
+.maplink-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.maplink-row:hover,
+.maplink-row[aria-current='true'] {
+  background: #f3f4f6;
+}
+
+.maplink-row__dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.maplink-row__emoji {
+  flex: none;
+  width: 16px;
+  text-align: center;
+}
+
+.maplink-row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.maplink-row__title {
+  display: block;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.maplink-row__sub {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.maplink-row__trail {
+  flex: none;
+  font-weight: 700;
+  color: #374151;
+  font-variant-numeric: tabular-nums;
+}
+
+.maplink-panel__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 12px;
+  color: #374151;
+}
+
+.maplink-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.maplink-legend__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+@media (max-width: 640px) {
+  .maplink-panel {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-height: 45vh;
+    border-radius: 14px 14px 0 0;
+    transform: translateY(110%);
+  }
+
+  .maplink-panel[data-open='true'] {
+    transform: translateY(0);
+  }
+}

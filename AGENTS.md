@@ -21,6 +21,10 @@ data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.
   `/assets/*` and `/.well-known/*`. Without that exclusion a missing asset returns
   `index.html` with `200 text/html` instead of a 404 — the exact mask for the worker
   MIME error above.
+- **Overlay panel**: built imperatively into `.maplink-overlay`; `buildPanel().destroy()`
+  must run in the effect cleanup (StrictMode) or the panel and marker highlights leak.
+  When the panel is open, `fitBounds` uses `padding.left = 340` so markers aren't hidden
+  under it, and GL group filtering needs `group` written into feature properties.
 - **Import style**: `import * as maplibregl from 'maplibre-gl'` — there is no default
   export (`TS1192` if you "fix" it).
 - **StrictMode double-mount** (`src/main.tsx`): the map effect runs twice in dev. Map,

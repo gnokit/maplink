@@ -78,6 +78,14 @@
     },
     "autoFit": "If any drawables exist and neither center nor zoom is given, the map fits all of them."
   },
+  "panel": {
+    "description": "Optional left overlay panel listing every drawable. Appears when any drawable has a title or group.",
+    "title": { "syntax": "title={text}", "notes": "Panel heading." },
+    "visibility": { "syntax": "panel={0|1}", "default": "auto", "notes": "auto = open when any drawable has a title or group." },
+    "initialGroup": { "syntax": "group={name}", "notes": "Initially selected category chip." },
+    "groups": "Chips are built from the distinct `group` values, in first-seen order, prefixed with 全部 (All). Selecting a chip filters both the list and the map.",
+    "focus": "Clicking a row flies to the drawable and opens its popup."
+  },
   "drawables": [
     {
       "id": "marker",
@@ -100,7 +108,9 @@
         { "key": "opacity", "type": "number 0-1", "default": 1 },
         { "key": "drag", "type": "0 | 1", "default": 0, "notes": "Allow dragging the pin. Also accepts true." },
         { "key": "title", "type": "string", "notes": "Popup title." },
-        { "key": "body", "type": "string", "notes": "Popup body; \\n becomes a line break." }
+        { "key": "body", "type": "string", "notes": "Popup body; \\n becomes a line break." },
+        { "key": "group", "type": "string", "notes": "Category for panel chips/legend." },
+        { "key": "subtitle", "type": "string", "notes": "Second panel-list line; defaults to first body line." }
       ],
       "notes": "Over the DOM marker limit, renders as a GPU circle layer instead of DOM pins (see domMarkerLimit)."
     },
@@ -116,7 +126,9 @@
         { "key": "lat", "type": "number", "required": true },
         { "key": "lng", "type": "number", "required": true },
         { "key": "title", "type": "string", "notes": "At least one of title/body is required." },
-        { "key": "body", "type": "string", "notes": "At least one of title/body is required." }
+        { "key": "body", "type": "string", "notes": "At least one of title/body is required." },
+        { "key": "group", "type": "string", "notes": "Category for panel chips/legend." },
+        { "key": "subtitle", "type": "string", "notes": "Second panel-list line; defaults to first body line." }
       ]
     },
     {
@@ -133,7 +145,9 @@
         { "key": "width", "type": "number", "default": 4, "notes": "Line width in pixels." },
         { "key": "opacity", "type": "number 0-1", "default": 1 },
         { "key": "title", "type": "string" },
-        { "key": "body", "type": "string" }
+        { "key": "body", "type": "string" },
+        { "key": "group", "type": "string", "notes": "Category for panel chips/legend." },
+        { "key": "subtitle", "type": "string", "notes": "Second panel-list line; defaults to first body line." }
       ]
     },
     {
@@ -150,7 +164,9 @@
         { "key": "opacity", "type": "number 0-1", "default": 0.2, "notes": "Fill opacity." },
         { "key": "outline", "type": "CSS color", "default": "same as color", "notes": "Outline stroke." },
         { "key": "title", "type": "string" },
-        { "key": "body", "type": "string" }
+        { "key": "body", "type": "string" },
+        { "key": "group", "type": "string", "notes": "Category for panel chips/legend." },
+        { "key": "subtitle", "type": "string", "notes": "Second panel-list line; defaults to first body line." }
       ]
     },
     {
@@ -168,12 +184,16 @@
         { "key": "color", "type": "CSS color", "default": "#16a34a" },
         { "key": "opacity", "type": "number 0-1", "default": 0.2 },
         { "key": "title", "type": "string" },
-        { "key": "body", "type": "string" }
+        { "key": "body", "type": "string" },
+        { "key": "group", "type": "string", "notes": "Category for panel chips/legend." },
+        { "key": "subtitle", "type": "string", "notes": "Second panel-list line; defaults to first body line." }
       ]
     }
   ],
   "sharedFieldNotes": {
     "title": "Click-popup title. HTML-escaped.",
-    "body": "Click-popup body. HTML-escaped; newlines become line breaks."
+    "body": "Click-popup body. HTML-escaped; newlines become line breaks.",
+    "group": "Category used by the panel chips and legend.",
+    "subtitle": "Second line in the panel list; defaults to the first body line."
   }
 }

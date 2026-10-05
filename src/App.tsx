@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import './panel.css'
 import {
   ANCHORS,
   DEFAULTS,
@@ -15,14 +16,15 @@ import {
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 // ---------------------------------------------------------------------------
-// URL drawable API (see conversation for spec):
+// URL drawable API (see README; src/maplink.schema.json is the doc source):
 //   m=lat:{}|lng:{}|label:{}|emoji:{}|color:{}|scale:{}|anchor:{}|offset:{x},{y}
-//     |rotation:{}|opacity:{}|drag:{0|1}|title:{}|body:{}
-//   popup=lat:{}|lng:{}|title:{}|body:{}
-//   line=pts:{lat},{lng};…|color:{}|width:{}|opacity:{}|title:{}|body:{}
-//   area=pts:{lat},{lng};…|color:{}|opacity:{}|outline:{}|title:{}|body:{}
-//   circle=lat:{}|lng:{}|radius:{m}|color:{}|opacity:{}|title:{}|body:{}
+//     |rotation:{}|opacity:{}|drag:{0|1}|title:{}|body:{}|group:{}|subtitle:{}
+//   popup=lat:{}|lng:{}|title:{}|body:{}|group:{}|subtitle:{}
+//   line=pts:{lat},{lng};…|color:{}|width:{}|opacity:{}|title:{}|body:{}|group:{}|subtitle:{}
+//   area=pts:{lat},{lng};…|color:{}|opacity:{}|outline:{}|title:{}|body:{}|group:{}|subtitle:{}
+//   circle=lat:{}|lng:{}|radius:{m}|color:{}|opacity:{}|title:{}|body:{}|group:{}|subtitle:{}
 //   center={lat}|{lng}  zoom={n}  style={bright|positron|liberty}
+//   title={panel heading}  panel={0|1}  group={initial chip}
 // All drawable params are repeatable. Only listed keys are read, malformed
 // entries are ignored, max 100 entries per type. `\|` / `\:` escape separators.
 // ---------------------------------------------------------------------------
@@ -41,9 +43,18 @@ type DrawMarker = {
   draggable?: boolean
   title?: string
   body?: string
+  group?: string
+  subtitle?: string
 }
 
-type DrawPopup = { lat: number; lng: number; title?: string; body?: string }
+type DrawPopup = {
+  lat: number
+  lng: number
+  title?: string
+  body?: string
+  group?: string
+  subtitle?: string
+}
 
 type DrawLine = {
   pts: Array<[number, number]>
@@ -52,6 +63,8 @@ type DrawLine = {
   opacity?: number
   title?: string
   body?: string
+  group?: string
+  subtitle?: string
 }
 
 type DrawArea = {
@@ -61,6 +74,8 @@ type DrawArea = {
   outline?: string
   title?: string
   body?: string
+  group?: string
+  subtitle?: string
 }
 
 type DrawCircle = {
@@ -71,6 +86,8 @@ type DrawCircle = {
   opacity?: number
   title?: string
   body?: string
+  group?: string
+  subtitle?: string
 }
 
 type GJFeature = {
@@ -162,6 +179,8 @@ function parseMarker(item: string): DrawMarker | undefined {
   if (kv.drag === '1' || kv.drag === 'true') m.draggable = true
   if (kv.title) m.title = kv.title
   if (kv.body) m.body = kv.body
+  if (kv.group) m.group = kv.group
+  if (kv.subtitle) m.subtitle = kv.subtitle
   return m
 }
 
@@ -169,7 +188,12 @@ function parsePopup(item: string): DrawPopup | undefined {
   const kv = parseKV(item)
   const ll = latLng(kv.lat, kv.lng)
   if (!ll) return undefined
-  return { lat: ll.lat, lng: ll.lng, title: kv.title, body: kv.body }
+  const p: DrawPopup = { lat: ll.lat, lng: ll.lng }
+  if (kv.title) p.title = kv.title
+  if (kv.body) p.body = kv.body
+  if (kv.group) p.group = kv.group
+  if (kv.subtitle) p.subtitle = kv.subtitle
+  return p
 }
 
 function parseLine(item: string): DrawLine | undefined {
@@ -184,6 +208,8 @@ function parseLine(item: string): DrawLine | undefined {
   if (opacity !== undefined && opacity >= 0 && opacity <= 1) line.opacity = opacity
   if (kv.title) line.title = kv.title
   if (kv.body) line.body = kv.body
+  if (kv.group) line.group = kv.group
+  if (kv.subtitle) line.subtitle = kv.subtitle
   return line
 }
 
@@ -203,6 +229,8 @@ function parseArea(item: string): DrawArea | undefined {
   if (kv.outline) area.outline = kv.outline
   if (kv.title) area.title = kv.title
   if (kv.body) area.body = kv.body
+  if (kv.group) area.group = kv.group
+  if (kv.subtitle) area.subtitle = kv.subtitle
   return area
 }
 
@@ -217,6 +245,8 @@ function parseCircle(item: string): DrawCircle | undefined {
   if (opacity !== undefined && opacity >= 0 && opacity <= 1) circle.opacity = opacity
   if (kv.title) circle.title = kv.title
   if (kv.body) circle.body = kv.body
+  if (kv.group) circle.group = kv.group
+  if (kv.subtitle) circle.subtitle = kv.subtitle
   return circle
 }
 
@@ -229,6 +259,10 @@ type DrawableSet = {
   center?: [number, number]
   zoom?: number
   style: string
+  panelTitle?: string
+  hasPanel: boolean
+  panelOpen: boolean
+  initialGroup?: string
 }
 
 // Fallback data (Ho Man Tin parkings) when the URL carries no drawables.
@@ -239,6 +273,7 @@ const FALLBACK_MARKERS: DrawMarker[] = [
     label: '1',
     emoji: '🏢',
     color: '#2563eb',
+    group: '停車場',
     title: '何文田停車場（何文田廣場）',
     body: '空位：🟢 30\n更新：14:05\n限高 1.8 米',
   },
@@ -248,6 +283,7 @@ const FALLBACK_MARKERS: DrawMarker[] = [
     label: '2',
     emoji: '🅿️',
     color: '#16a34a',
+    group: '咪錶',
     title: '常樂街咪錶（近常盛街）',
     body: '空位：🟢 13／19\n更新：14:02\n$4／15 分鐘，最長 2 小時',
   },
@@ -257,6 +293,7 @@ const FALLBACK_MARKERS: DrawMarker[] = [
     label: '3',
     emoji: '🏢',
     color: '#2563eb',
+    group: '停車場',
     title: '何文田體育館停車場',
     body: '空位：🟢 21\n更新：14:03\n限高 2.45 米；首 2 小時 $5.6／半小時，之後 $8.4／半小時',
   },
@@ -266,6 +303,7 @@ const FALLBACK_MARKERS: DrawMarker[] = [
     label: '4',
     emoji: '🏢',
     color: '#2563eb',
+    group: '停車場',
     title: '愛民停車場（愛民廣場）',
     body: '空位：🟢 30\n更新：14:05\n限高 2 米',
   },
@@ -275,6 +313,7 @@ const FALLBACK_MARKERS: DrawMarker[] = [
     label: '5',
     emoji: '🅿️',
     color: '#16a34a',
+    group: '咪錶',
     title: '靠背壟道咪錶（近浙江街）',
     body: '空位：🟢 16／78\n更新：14:05\n$4／15 分鐘，最長 2 小時',
   },
@@ -322,8 +361,24 @@ function parseDrawables(search: string): DrawableSet {
     areas.length > 0 ||
     circles.length > 0
 
+  const activeMarkers = hasUrlDrawables ? markers : FALLBACK_MARKERS
+  const allDrawables: Array<{ title?: string; group?: string }> = [
+    ...activeMarkers,
+    ...popups,
+    ...lines,
+    ...areas,
+    ...circles,
+  ]
+  const hasTitles = allDrawables.some((d) => d.title || d.group)
+
+  const panelParam = params.get('panel')
+  const panelTitle = params.get('title') || undefined
+  const initialGroup = params.get('group') || undefined
+  const hasPanel = hasTitles || panelParam === '1'
+  const panelOpen = panelParam === '1' ? true : panelParam === '0' ? false : hasTitles
+
   return {
-    markers: hasUrlDrawables ? markers : FALLBACK_MARKERS,
+    markers: activeMarkers,
     popups,
     lines,
     areas,
@@ -331,6 +386,10 @@ function parseDrawables(search: string): DrawableSet {
     center,
     zoom,
     style,
+    panelTitle,
+    hasPanel,
+    panelOpen,
+    initialGroup,
   }
 }
 
@@ -392,15 +451,327 @@ function featurePopupHtml(f: maplibregl.MapGeoJSONFeature): string | undefined {
   return popupHtml(title, body)
 }
 
+// ---------------------------------------------------------------------------
+// Overlay panel (Google-Maps-style list of the URL's drawables).
+// ---------------------------------------------------------------------------
+
+type PanelItem = {
+  key: string
+  title: string
+  subtitle?: string
+  color: string
+  emoji?: string
+  trailing?: string
+  group?: string
+  lng: number
+  lat: number
+  html?: string
+}
+
+type Groupable = { element: HTMLElement; group?: string }
+type MapFilter = Parameters<maplibregl.Map['setFilter']>[1]
+
+function firstLine(body: string | undefined): string | undefined {
+  if (!body) return undefined
+  const line = body.split('\n')[0].trim()
+  return line || undefined
+}
+
+function midpoint(pts: Array<[number, number]>): [number, number] {
+  return pts[Math.floor((pts.length - 1) / 2)]
+}
+
+function centroid(pts: Array<[number, number]>): [number, number] {
+  let x = 0
+  let y = 0
+  for (const p of pts) {
+    x += p[0]
+    y += p[1]
+  }
+  return [x / pts.length, y / pts.length]
+}
+
+function buildItems(draw: DrawableSet): PanelItem[] {
+  const items: PanelItem[] = []
+
+  draw.markers.forEach((m, i) => {
+    items.push({
+      key: `m-${i}`,
+      title: m.title || m.label || m.emoji || `標記 ${i + 1}`,
+      subtitle: m.subtitle ?? firstLine(m.body),
+      color: m.color ?? DEFAULTS.marker.color,
+      emoji: m.emoji,
+      trailing: m.label,
+      group: m.group,
+      lng: m.lng,
+      lat: m.lat,
+      html: m.title || m.body ? popupHtml(m.title, m.body, m.emoji) : undefined,
+    })
+  })
+
+  draw.popups.forEach((p, i) => {
+    items.push({
+      key: `p-${i}`,
+      title: p.title || `地點 ${i + 1}`,
+      subtitle: p.subtitle ?? firstLine(p.body),
+      color: '#6b7280',
+      group: p.group,
+      lng: p.lng,
+      lat: p.lat,
+      html: popupHtml(p.title, p.body),
+    })
+  })
+
+  draw.lines.forEach((l, i) => {
+    const [lng, lat] = midpoint(l.pts)
+    items.push({
+      key: `l-${i}`,
+      title: l.title || `路線 ${i + 1}`,
+      subtitle: l.subtitle ?? firstLine(l.body),
+      color: l.color ?? DEFAULTS.line.color,
+      group: l.group,
+      lng,
+      lat,
+      html: l.title || l.body ? popupHtml(l.title, l.body) : undefined,
+    })
+  })
+
+  draw.areas.forEach((a, i) => {
+    const [lng, lat] = centroid(a.pts)
+    items.push({
+      key: `a-${i}`,
+      title: a.title || `區域 ${i + 1}`,
+      subtitle: a.subtitle ?? firstLine(a.body),
+      color: a.color ?? DEFAULTS.area.color,
+      group: a.group,
+      lng,
+      lat,
+      html: a.title || a.body ? popupHtml(a.title, a.body) : undefined,
+    })
+  })
+
+  draw.circles.forEach((c, i) => {
+    items.push({
+      key: `c-${i}`,
+      title: c.title || `範圍 ${i + 1}`,
+      subtitle: c.subtitle ?? firstLine(c.body),
+      color: c.color ?? DEFAULTS.circle.color,
+      group: c.group,
+      lng: c.lng,
+      lat: c.lat,
+      html: c.title || c.body ? popupHtml(c.title, c.body) : undefined,
+    })
+  })
+
+  return items
+}
+
+function buildPanel(opts: {
+  map: maplibregl.Map
+  items: PanelItem[]
+  title?: string
+  groups: string[]
+  initialGroup?: string
+  markerEls: Groupable[]
+  popupEls: Groupable[]
+  open: boolean
+}): { root: HTMLElement; applyGroup: (g: string | null) => void; destroy: () => void } {
+  const { map } = opts
+
+  const root = document.createElement('div')
+  root.className = 'maplink-panel-root'
+
+  const toggle = document.createElement('button')
+  toggle.type = 'button'
+  toggle.className = 'maplink-toggle'
+  toggle.textContent = '☰'
+  toggle.setAttribute('aria-label', '顯示清單')
+  toggle.setAttribute('aria-expanded', 'false')
+
+  const panel = document.createElement('aside')
+  panel.className = 'maplink-panel'
+  panel.dataset.open = String(opts.open)
+
+  const head = document.createElement('div')
+  head.className = 'maplink-panel__head'
+  const heading = document.createElement('h2')
+  heading.className = 'maplink-panel__title'
+  heading.textContent = opts.title ?? ''
+  if (!opts.title) heading.hidden = true
+  const closeBtn = document.createElement('button')
+  closeBtn.type = 'button'
+  closeBtn.className = 'maplink-panel__close'
+  closeBtn.textContent = '☰'
+  closeBtn.setAttribute('aria-label', '收起清單')
+  head.append(heading, closeBtn)
+  panel.appendChild(head)
+
+  const chipValues: Array<string | null> = [null, ...opts.groups]
+  const chipButtons: HTMLButtonElement[] = []
+  if (opts.groups.length > 0) {
+    const chipsWrap = document.createElement('div')
+    chipsWrap.className = 'maplink-panel__chips'
+    for (const gv of chipValues) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'maplink-chip'
+      b.textContent = gv ?? '全部'
+      b.setAttribute('aria-pressed', 'false')
+      b.addEventListener('click', () => setGroup(gv))
+      chipButtons.push(b)
+      chipsWrap.appendChild(b)
+    }
+    panel.appendChild(chipsWrap)
+  }
+
+  const list = document.createElement('ul')
+  list.className = 'maplink-panel__list'
+  const rows: Array<{ li: HTMLLIElement; item: PanelItem }> = []
+  for (const it of opts.items) {
+    const li = document.createElement('li')
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'maplink-row'
+    const lead = document.createElement('span')
+    if (it.emoji) {
+      lead.className = 'maplink-row__emoji'
+      lead.textContent = it.emoji
+    } else {
+      lead.className = 'maplink-row__dot'
+      lead.style.background = it.color
+    }
+    const text = document.createElement('span')
+    text.className = 'maplink-row__text'
+    const ttl = document.createElement('span')
+    ttl.className = 'maplink-row__title'
+    ttl.textContent = it.title
+    text.appendChild(ttl)
+    if (it.subtitle) {
+      const sub = document.createElement('span')
+      sub.className = 'maplink-row__sub'
+      sub.textContent = it.subtitle
+      text.appendChild(sub)
+    }
+    btn.append(lead, text)
+    if (it.trailing) {
+      const trail = document.createElement('span')
+      trail.className = 'maplink-row__trail'
+      trail.textContent = it.trailing
+      btn.appendChild(trail)
+    }
+    btn.addEventListener('click', () => focusItem(it, btn))
+    li.appendChild(btn)
+    list.appendChild(li)
+    rows.push({ li, item: it })
+  }
+  panel.appendChild(list)
+
+  if (opts.groups.length > 0) {
+    const legend = document.createElement('div')
+    legend.className = 'maplink-panel__legend'
+    for (const g of opts.groups) {
+      const source = opts.items.find((i) => i.group === g)
+      const wrap = document.createElement('span')
+      wrap.className = 'maplink-legend__item'
+      const dot = document.createElement('span')
+      dot.className = 'maplink-legend__dot'
+      dot.style.background = source?.color ?? '#6b7280'
+      const label = document.createElement('span')
+      label.textContent = g
+      wrap.append(dot, label)
+      legend.appendChild(wrap)
+    }
+    panel.appendChild(legend)
+  }
+
+  root.append(toggle, panel)
+
+  let focusPopup: maplibregl.Popup | null = null
+  let activeBtn: HTMLButtonElement | null = null
+
+  function clearActive() {
+    if (activeBtn) {
+      activeBtn.removeAttribute('aria-current')
+      activeBtn = null
+    }
+    for (const m of opts.markerEls) m.element.style.outline = ''
+  }
+
+  function focusItem(it: PanelItem, btn: HTMLButtonElement) {
+    if (focusPopup) {
+      focusPopup.remove()
+      focusPopup = null
+    }
+    clearActive()
+    if (it.html) {
+      focusPopup = new maplibregl.Popup({ offset: 24 })
+        .setLngLat([it.lng, it.lat])
+        .setHTML(it.html)
+        .addTo(map)
+    }
+    map.flyTo({ center: [it.lng, it.lat], zoom: Math.max(map.getZoom(), 15), duration: 600 })
+    btn.setAttribute('aria-current', 'true')
+    activeBtn = btn
+    const marker = opts.markerEls.find((m) => m.element.dataset.maplinkKey === it.key)
+    if (marker) marker.element.style.outline = '3px solid #111827'
+  }
+
+  function applyGroup(g: string | null) {
+    for (const r of rows) r.li.hidden = !(g === null || r.item.group === g)
+    for (const m of opts.markerEls) m.element.style.display = g === null || m.group === g ? '' : 'none'
+    for (const p of opts.popupEls) p.element.style.display = g === null || p.group === g ? '' : 'none'
+    const withGroup = (base: MapFilter): MapFilter => {
+      if (g === null) return base
+      const byGroup = ['==', ['get', 'group'], g]
+      return (base ? ['all', base, byGroup] : byGroup) as unknown as MapFilter
+    }
+    if (map.getLayer('maplink-area')) map.setFilter('maplink-area', withGroup(['==', '$type', 'Polygon']))
+    if (map.getLayer('maplink-area-outline'))
+      map.setFilter('maplink-area-outline', withGroup(['==', '$type', 'Polygon']))
+    if (map.getLayer('maplink-line'))
+      map.setFilter('maplink-line', withGroup(['==', '$type', 'LineString']))
+    if (map.getLayer('maplink-points'))
+      map.setFilter('maplink-points', g === null ? null : (['==', ['get', 'group'], g] as unknown as MapFilter))
+  }
+
+  function setGroup(g: string | null) {
+    chipButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(chipValues[i] === g)))
+    applyGroup(g)
+  }
+
+  function setOpen(open: boolean) {
+    panel.dataset.open = String(open)
+    toggle.hidden = open
+    toggle.setAttribute('aria-expanded', String(open))
+  }
+
+  toggle.addEventListener('click', () => setOpen(true))
+  closeBtn.addEventListener('click', () => setOpen(false))
+  setOpen(opts.open)
+  setGroup(opts.initialGroup ?? null)
+
+  return {
+    root,
+    applyGroup,
+    destroy() {
+      if (focusPopup) focusPopup.remove()
+      root.remove()
+    },
+  }
+}
+
 function App() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!containerRef.current) return
+    const container = containerRef.current
+    const overlay = overlayRef.current
+    if (!container || !overlay) return
     const draw = parseDrawables(window.location.search)
 
     const map = new maplibregl.Map({
-      container: containerRef.current,
+      container,
       style: draw.style,
       center: draw.center ?? DEFAULT_CENTER,
       zoom: draw.zoom ?? DEFAULT_ZOOM,
@@ -410,10 +781,13 @@ function App() {
     // Markers + standalone popups don't depend on the style — add immediately.
     const usePointsLayer = draw.markers.length > DOM_MARKER_LIMIT
     const markers: maplibregl.Marker[] = []
+    const markerEls: Groupable[] = []
     if (!usePointsLayer) {
       draw.markers.forEach((m, i) => {
+        const element = markerElement(m, String(i + 1))
+        element.dataset.maplinkKey = `m-${i}`
         const marker = new maplibregl.Marker({
-          element: markerElement(m, String(i + 1)),
+          element,
           anchor: m.anchor,
           offset: m.offset,
           rotation: m.rotation,
@@ -427,19 +801,46 @@ function App() {
           )
         }
         if (m.opacity !== undefined) {
-          marker.getElement().style.opacity = String(m.opacity)
+          element.style.opacity = String(m.opacity)
         }
         markers.push(marker)
+        markerEls.push({ element, group: m.group })
       })
     }
-    const popups = draw.popups
-      .filter((p) => p.title || p.body)
-      .map((p) =>
-        new maplibregl.Popup({ offset: 24 })
-          .setLngLat([p.lng, p.lat])
-          .setHTML(popupHtml(p.title, p.body))
-          .addTo(map),
-      )
+
+    const popups: maplibregl.Popup[] = []
+    const popupEls: Groupable[] = []
+    for (const p of draw.popups) {
+      if (!p.title && !p.body) continue
+      const popup = new maplibregl.Popup({ offset: 24 })
+        .setLngLat([p.lng, p.lat])
+        .setHTML(popupHtml(p.title, p.body))
+        .addTo(map)
+      popups.push(popup)
+      popupEls.push({ element: popup.getElement(), group: p.group })
+    }
+
+    const items = buildItems(draw)
+    const groups = [
+      ...new Set(items.map((i) => i.group).filter((g): g is string => Boolean(g))),
+    ]
+    const initialGroup =
+      draw.initialGroup && groups.includes(draw.initialGroup) ? draw.initialGroup : undefined
+    const panel =
+      draw.hasPanel && items.length > 0
+        ? buildPanel({
+            map,
+            items,
+            title: draw.panelTitle,
+            groups,
+            initialGroup,
+            markerEls,
+            popupEls,
+            open: draw.panelOpen,
+          })
+        : null
+    if (panel) overlay.appendChild(panel.root)
+    const panelPaddingLeft = panel && draw.panelOpen ? 340 : 80
 
     map.on('load', () => {
       // Lines + areas (+ radius circles as polygons) share one GeoJSON source,
@@ -455,6 +856,7 @@ function App() {
             opacity: l.opacity ?? DEFAULTS.line.opacity,
             title: l.title ?? null,
             body: l.body ?? null,
+            group: l.group ?? null,
           },
         })
       }
@@ -468,6 +870,7 @@ function App() {
             outline: a.outline ?? a.color ?? DEFAULTS.area.color,
             title: a.title ?? null,
             body: a.body ?? null,
+            group: a.group ?? null,
           },
         })
       }
@@ -481,6 +884,7 @@ function App() {
             outline: c.color ?? DEFAULTS.circle.color,
             title: c.title ?? null,
             body: c.body ?? null,
+            group: c.group ?? null,
           },
         })
       }
@@ -549,6 +953,7 @@ function App() {
                 color: m.color ?? DEFAULTS.marker.color,
                 title: m.title ?? m.label ?? `Marker ${i + 1}`,
                 body: m.body ?? null,
+                group: m.group ?? null,
               },
             })),
           },
@@ -572,33 +977,54 @@ function App() {
         })
       }
 
+      // The layers exist now, so sync the panel's initial group filter.
+      panel?.applyGroup(initialGroup ?? null)
+
       // Auto-fit everything unless the URL pins the view.
       if (!draw.center && !draw.zoom) {
         const bounds = new maplibregl.LngLatBounds()
         let has = false
+        const inGroup = (g: string | undefined) => !initialGroup || g === initialGroup
         const extend = (lng: number, lat: number) => {
           bounds.extend([lng, lat])
           has = true
         }
-        for (const m of draw.markers) extend(m.lng, m.lat)
-        for (const p of draw.popups) extend(p.lng, p.lat)
-        for (const l of draw.lines) for (const [lng, lat] of l.pts) extend(lng, lat)
-        for (const a of draw.areas) for (const [lng, lat] of a.pts) extend(lng, lat)
+        for (const m of draw.markers) if (inGroup(m.group)) extend(m.lng, m.lat)
+        for (const p of draw.popups) if (inGroup(p.group)) extend(p.lng, p.lat)
+        for (const l of draw.lines) {
+          if (inGroup(l.group)) for (const [lng, lat] of l.pts) extend(lng, lat)
+        }
+        for (const a of draw.areas) {
+          if (inGroup(a.group)) for (const [lng, lat] of a.pts) extend(lng, lat)
+        }
         for (const c of draw.circles) {
+          if (!inGroup(c.group)) continue
           for (const [lng, lat] of circleRing(c.lng, c.lat, c.radius, 16)) extend(lng, lat)
         }
-        if (has) map.fitBounds(bounds, { padding: 80, maxZoom: 16, duration: 0 })
+        if (has) {
+          map.fitBounds(bounds, {
+            padding: { top: 80, right: 80, bottom: 80, left: panelPaddingLeft },
+            maxZoom: 16,
+            duration: 0,
+          })
+        }
       }
     })
 
     return () => {
+      panel?.destroy()
       for (const m of markers) m.remove()
       for (const p of popups) p.remove()
       map.remove()
     }
   }, [])
 
-  return <div ref={containerRef} style={{ width: '100vw', height: '100vh' }} />
+  return (
+    <div className="maplink-root">
+      <div ref={containerRef} className="maplink-map" />
+      <div ref={overlayRef} className="maplink-overlay" />
+    </div>
+  )
 }
 
 export default App

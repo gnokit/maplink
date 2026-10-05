@@ -57,6 +57,13 @@ ${drawableLines}
 - \`zoom={n}\` \u2014 ${zoom.min}\u2013${zoom.max} (default ${zoom.default})
 - \`style\` \u2014 ${schema.enums.style.join(', ')} (default ${schema.defaultStyle})
 
+## Panel
+
+- \`title={text}\` \u2014 heading for the optional left-hand list of drawables
+- \`panel={0|1}\` \u2014 force the list open or closed (default: auto)
+- \`group={name}\` \u2014 category chip selected on load
+- Drawables accept \`group\` and \`subtitle\`; chips filter both the list and the map, and clicking a row focuses the drawable.
+
 ## Encoding
 
 - ${enc.repeatable}
