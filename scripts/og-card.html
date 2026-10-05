@@ -1,0 +1,77 @@
+<!doctype html>
+<!--
+  Open Graph card source for public/og.png (1200x630).
+  Regenerate with headless Chrome, e.g.:
+    playwright-cli open "file://$PWD/scripts/og-card.html"
+    playwright-cli resize 1200 630
+    playwright-cli screenshot --filename=public/og.png
+  Keep the copy generic (maplink is a general link->map tool, not parking).
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1200px; height: 630px; overflow: hidden; }
+      body {
+        position: relative;
+        background: radial-gradient(1200px 700px at 12% 8%, #1e293b 0%, #0b1220 60%, #070c16 100%);
+        color: #f8fafc;
+        font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang HK', 'Noto Sans CJK HK', sans-serif;
+      }
+      .motif { position: absolute; inset: 0; }
+      .shade {
+        position: absolute; inset: 0;
+        background: linear-gradient(90deg, #0b1220 0%, #0b1220 34%, rgba(11, 18, 32, 0.6) 58%, rgba(11, 18, 32, 0.05) 100%);
+      }
+      .content {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column; justify-content: center;
+        padding: 0 80px;
+      }
+      .brand { font-size: 124px; font-weight: 800; letter-spacing: -4px; line-height: 1; }
+      .tag { margin-top: 26px; font-size: 36px; font-weight: 500; color: #94a3b8; }
+      .url { position: absolute; left: 80px; bottom: 62px; font-size: 26px; color: #64748b; }
+      .dots { display: flex; gap: 16px; margin-bottom: 40px; }
+      .dot { width: 28px; height: 28px; border-radius: 50%; border: 3px solid #0b1220; }
+    </style>
+  </head>
+  <body>
+    <svg class="motif" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+      <!-- zone polygon -->
+      <polygon
+        points="690,140 1090,190 1140,470 780,540 630,360"
+        fill="#2563eb" fill-opacity="0.10"
+        stroke="#3b82f6" stroke-opacity="0.35" stroke-width="3"
+      />
+      <!-- radius ring -->
+      <circle
+        cx="880" cy="330" r="155"
+        fill="#16a34a" fill-opacity="0.08"
+        stroke="#22c55e" stroke-opacity="0.45" stroke-width="3"
+        stroke-linecap="round" stroke-dasharray="2 12"
+      />
+      <!-- route -->
+      <path
+        d="M640,510 C760,480 790,410 875,330 S1010,215 1120,175"
+        fill="none" stroke="#f43f5e" stroke-opacity="0.85" stroke-width="7"
+        stroke-linecap="round" stroke-dasharray="14 18"
+      />
+      <!-- markers -->
+      <circle cx="640" cy="510" r="17" fill="#2563eb" stroke="#ffffff" stroke-width="6" />
+      <circle cx="875" cy="330" r="17" fill="#16a34a" stroke="#ffffff" stroke-width="6" />
+      <circle cx="1120" cy="175" r="17" fill="#f59e0b" stroke="#ffffff" stroke-width="6" />
+    </svg>
+    <div class="shade"></div>
+    <div class="content">
+      <div class="dots">
+        <span class="dot" style="background: #2563eb"></span>
+        <span class="dot" style="background: #f59e0b"></span>
+        <span class="dot" style="background: #16a34a"></span>
+      </div>
+      <div class="brand">maplink</div>
+      <div class="tag">A map in every link · 以連結分享地圖</div>
+    </div>
+    <div class="url">maplink-five.vercel.app</div>
+  </body>
+</html>

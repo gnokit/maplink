@@ -1,10 +1,52 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-Hant-HK">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>maplink</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>maplink — a map in every link</title>
+    <meta
+      name="description"
+      content="maplink turns a URL into a map: markers, popups, routes, zones and radius rings are all defined in the link. No backend, no sign-in — paste a link, get the same map."
+    />
+    <meta name="theme-color" content="#0b1220" />
+    <link rel="canonical" href="https://maplink-five.vercel.app/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="maplink" />
+    <meta property="og:title" content="maplink — a map in every link" />
+    <meta
+      property="og:description"
+      content="A full-screen map defined entirely by the URL. Markers, popups, routes, zones and radius rings — no backend. Paste a link, get the same map."
+    />
+    <meta property="og:url" content="https://maplink-five.vercel.app/" />
+    <meta property="og:image" content="https://maplink-five.vercel.app/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="maplink — a map in every link" />
+    <meta property="og:locale" content="zh_HK" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="maplink — a map in every link" />
+    <meta
+      name="twitter:description"
+      content="A full-screen map defined entirely by the URL. No backend — paste a link, get the same map."
+    />
+    <meta name="twitter:image" content="https://maplink-five.vercel.app/og.png" />
+    <meta name="twitter:image:alt" content="maplink — a map in every link" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "maplink",
+        "url": "https://maplink-five.vercel.app/",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Any",
+        "description": "A full-screen map defined entirely by the URL query string.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "HKD" }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -57,3 +57,7 @@ data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.
 - Drawable field aliases live in `fieldAliases` in `src/maplink.schema.json` and are
   normalised to canonical names in `parseKV` (`src/App.tsx`). Add a field to the schema,
   the alias map and the README together.
+- The production host is hard-coded in `index.html`, `public/robots.txt`,
+  `public/sitemap.xml` and `scripts/og-card.html` (`maplink-five.vercel.app`). Update all
+  four together if the domain changes; regenerate `public/og.png` from
+  `scripts/og-card.html` with headless Chrome.

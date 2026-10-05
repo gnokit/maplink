@@ -1,0 +1,6 @@
+# maplink is a single page; map URLs are infinite query-string permutations of it.
+# Index the root only, not every generated map link.
+User-agent: *
+Disallow: /*?
+
+Sitemap: https://maplink-five.vercel.app/sitemap.xml
