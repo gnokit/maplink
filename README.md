@@ -26,7 +26,7 @@ string to append to that URL.
 <figure>
   <img src="docs/screenshots/harry-potter-libraries.webp" alt="Kowloon public libraries grouped by 推薦 (recommended, starred) vs 其他, each pin labelled with the Harry Potter Chinese-edition volumes it holds (e.g. 2,3,4,5,6,7), panel rows trailing their volume list" width="720">
   <figcaption>
-    <strong>哈利波特中文版 · 架上地圖</strong> — public libraries that stock the
+    <strong>哈利波特中文版 · 九龍區公共圖書館架上地圖</strong> — public libraries that stock the
     Chinese edition, grouped 推薦 (starred, full set) vs 其他. Each numbered pin
     (<code>label:</code>) tells at a glance which volumes that library holds,
     and panel rows trail their full volume list.
