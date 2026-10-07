@@ -25,6 +25,8 @@ string to append to that URL.
 
 - **Link = state.** Reload, bookmark, share or embed it — the map comes back identical.
 - **Nothing to host.** No backend, no API key. Basemaps come from [OpenFreeMap](https://openfreemap.org/) vector tiles.
+- **Real street routes.** `route=` resolves driving / walking / cycling routes at
+  view time via [routing.openstreetmap.de](https://routing.openstreetmap.de/) — free, no key.
 - **One file of logic.** The entire map lives in [`src/App.tsx`](src/App.tsx).
 - **It scales.** Past 50 markers, DOM pins automatically upgrade to a GPU `circle` layer.
 
@@ -37,8 +39,9 @@ npm run build    # type-check + production build
 ```
 
 With no params at all, the map falls back to a built-in Victoria Harbour demo
-that showcases every primitive at once — markers, a standalone popup, a walking
-route, a zone and a radius ring — with grouped categories in the panel.
+that exercises the three core primitives with grouped categories in the panel —
+two markers, a live driving route (one OSRM request at view time) and a 500 m
+walking ring.
 
 ## 📖 URL API
 
@@ -46,9 +49,9 @@ route, a zone and a radius ring — with grouped categories in the panel.
 
 - **Repeatable** — each drawable param may appear many times; one object per occurrence.
 - **Field syntax** — `key:value` pairs joined by `|`, in any order.
-- **Required** — `lat` + `lng` for `m` / `popup` / `circle`; `pts` for `line` / `area`.
+- **Required** — `lat` + `lng` for `m` / `popup` / `circle`; `pts` for `line` / `area`; `from` + `to` for `route`.
 - **Forgiving** — unknown keys are ignored and malformed entries are skipped, never errored.
-- **Limit** — 100 entries per type.
+- **Limit** — 100 entries per type (`route`: 10, since each costs the visitor a routing request).
 - **Escaping** — write a literal separator as `\|` or `\:`. Popup text is HTML-escaped.
 - **Encoding** — non-ASCII just works; only `#` → `%23` and newline → `%0A` need hand-encoding.
 
@@ -68,13 +71,16 @@ spellings are accepted; AI agents should prefer the short form.
 | `anchor` | `k` | `width` | `w` |
 | `offset` | `f` | `outline` | `u` |
 | `rotation` | `q` | `opacity` | `y` |
-| `drag` | `d` | | |
+| `drag` | `d` | `from` | `x` |
+| | | `to` | `i` |
+| | | `via` | `v` |
+| | | `profile` | `h` |
 
 ```text
 ?m=a:22.315203|o:114.181846|l:30|e:🏢|c:2563eb|t:何文田停車場|g:停車場|b:空位 30
 ```
 
-Top-level params (`m`, `popup`, `line`, `area`, `circle`, `title`, `panel`, `group`,
+Top-level params (`m`, `popup`, `line`, `area`, `circle`, `route`, `title`, `panel`, `group`,
 `center`, `zoom`, `style`) are unchanged.
 
 ### Viewport
@@ -191,7 +197,42 @@ line=pts:{lat},{lng};{lat},{lng}[;…]|color:{}|width:{}|opacity:{}|title:{}|bod
 ?line=pts:22.3152,114.1818;22.3131,114.1806|color:%23e11d48|width:4|title:步行 5 分鐘|body:何文田廣場 → 何文田體育館
 ```
 
-### 4. Areas (zones / boundaries) — `area`
+### 4. Street routes — `route`
+
+A real path between two points, snapped to the street / footpath / cycle network.
+Unlike every other drawable, `route` is **resolved at view time**: the link only
+carries the endpoints, and each visitor's browser asks OSM's public OSRM routers
+([routing.openstreetmap.de](https://routing.openstreetmap.de/), free, no key) for
+the geometry. Endpoints are drawn as a straight line immediately and swap to the
+resolved path — with distance & duration added to the popup and panel row — when
+the response lands. If the request fails (offline, unroutable pair), the straight
+line stays and a console warning explains why.
+
+```text
+route=from:{lat},{lng}|to:{lat},{lng}[|via:{lat},{lng};…]|profile:{drive|walk|bike}
+     |color:{}|width:{}|opacity:{}|title:{}|body:{}|group:{}|subtitle:{}
+```
+
+| Key | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `from` `to` | `lat,lng` | — | required, route origin / destination |
+| `via` | `lat,lng` list | — | `;`-separated intermediate stops, visited in order |
+| `profile` | enum | `drive` | `drive` / `walk` / `bike` (also `car`, `foot`, `bicycle`) |
+| `color` | CSS color | `#0284c7` | |
+| `width` | number | `5` | line width in px |
+| `opacity` | `0`–`1` | `1` | |
+| `title` `body` | text | — | click-popup content; `📏 distance · ⏱ duration` is appended once resolved |
+
+**Drive from the ferry pier to the estate, with a pit stop:**
+
+```text
+?route=from:22.2939,114.1694|via:22.3080,114.1740|to:22.3120,114.1790|profile:drive|title:駕車去愛民邨
+```
+
+> Max **10 routes** per link — each visitor pays one routing request, so don't
+> link-bomb the router. No network → straight-line fallback.
+
+### 5. Areas (zones / boundaries) — `area`
 
 A GeoJSON `Polygon` rendered as a `fill` plus an outline `line`. The ring
 auto-closes if you don't repeat the first point.
@@ -214,7 +255,7 @@ area=pts:{lat},{lng};{lat},{lng}[;…]|color:{}|opacity:{}|outline:{}|title:{}|b
 ?area=pts:22.3120,114.1790;22.3120,114.1820;22.3100,114.1820;22.3100,114.1790|color:%232563eb|opacity:0.2|title:愛民邨範圍
 ```
 
-### 5. Circles (radius rings) — `circle`
+### 6. Circles (radius rings) — `circle`
 
 A center plus a radius in **meters**, approximated as a 64-sided polygon (styled
 like an area).
@@ -245,7 +286,7 @@ One link with a marker, a route and a zone — auto-fitted to the viewport:
 
 ```text
 ?m=lat:22.315203|lng:114.181846|emoji:🏢|title:何文田停車場|body:空位 30
-&line=pts:22.3152,114.1818;22.3131,114.1806|color:%23e11d48|width:4|title:步行 5 分鐘
+&route=from:22.2939,114.1694|to:22.3120,114.1790|profile:drive|title:駕車去愛民邨
 &area=pts:22.3120,114.1790;22.3120,114.1820;22.3100,114.1820;22.3100,114.1790|color:%232563eb|opacity:0.2|title:愛民邨範圍
 ```
 
@@ -254,8 +295,12 @@ One link with a marker, a route and a zone — auto-fitted to the viewport:
 `src/App.tsx` parses `window.location.search` into a `DrawableSet`
 (`parseDrawables`), renders DOM `Marker`s + `Popup`s immediately, and adds GeoJSON
 sources / layers on map `load` with per-feature data-driven styling. `circleRing`
-(a haversine destination) turns radius meters into polygon rings. Cleanup removes
-all markers, popups and layers on unmount — StrictMode-safe.
+(a haversine destination) turns radius meters into polygon rings. `route` entries
+enter the same GeoJSON source as straight endpoint lines and each spawns a fetch
+to OSM's public OSRM routers; resolved geometry and `📏 · ⏱` metrics replace the
+placeholder (autorefit follows), while failures keep the straight line. Cleanup
+removes all markers, popups and layers on unmount and aborts in-flight route
+fetches — StrictMode-safe.
 
 The URL grammar and every default live in **`src/maplink.schema.json`**, imported by
 `src/App.tsx` via `src/schema.ts` so code and docs share one source of truth.

@@ -21,6 +21,7 @@
       "\\n": "%0A"
     },
     "maxPerType": 100,
+    "maxRoutesPerType": 10,
     "colorHex": "Hex colours may omit the leading '#': write color:2563eb instead of color:%232563eb."
   },
   "styles": {
@@ -49,7 +50,11 @@
     "radius": "r",
     "pts": "p",
     "width": "w",
-    "outline": "u"
+    "outline": "u",
+    "from": "x",
+    "to": "i",
+    "via": "v",
+    "profile": "h"
   },
   "enums": {
     "style": ["bright", "positron", "liberty"],
@@ -76,6 +81,7 @@
       "drag": 0
     },
     "line": { "color": "#e11d48", "width": 4, "opacity": 1 },
+    "route": { "color": "#0284c7", "width": 5, "opacity": 1, "profile": "drive" },
     "area": { "color": "#2563eb", "opacity": 0.2 },
     "circle": { "color": "#16a34a", "opacity": 0.2 }
   },
@@ -171,6 +177,29 @@
         { "key": "group", "type": "string", "notes": "Category for panel chips/legend." },
         { "key": "subtitle", "type": "string", "notes": "Second panel-list line; defaults to first body line." }
       ]
+    },
+    {
+      "id": "route",
+      "key": "route",
+      "aliases": [],
+      "geometry": "LineString",
+      "description": "A real street route between two points, resolved client-side against OSM's public OSRM routers at view time (free, no key). Endpoints are drawn as a straight line immediately; the resolved geometry, distance and duration replace it when the request lands. Falls back to the straight line on failure.",
+      "required": ["from", "to"],
+      "example": "?route=from:22.2939,114.1694|to:22.3120,114.1790|profile:drive|title:駕車去愛民邨",
+      "fields": [
+        { "key": "from", "type": "lat,lng", "required": true, "notes": "Route origin." },
+        { "key": "to", "type": "lat,lng", "required": true, "notes": "Route destination." },
+        { "key": "via", "type": "lat,lng list", "notes": "Semicolon-separated lat,lng intermediate stops, visited in order." },
+        { "key": "profile", "type": "enum", "default": "drive", "enum": ["drive", "walk", "bike"], "notes": "Also accepts car/foot/bicycle/bicycle aliases." },
+        { "key": "color", "type": "CSS color", "default": "#0284c7" },
+        { "key": "width", "type": "number", "default": 5, "notes": "Line width in pixels." },
+        { "key": "opacity", "type": "number 0-1", "default": 1 },
+        { "key": "title", "type": "string", "notes": "Popup title." },
+        { "key": "body", "type": "string", "notes": "Popup body; distance/duration are appended automatically once resolved." },
+        { "key": "group", "type": "string", "notes": "Category for panel chips/legend." },
+        { "key": "subtitle", "type": "string", "notes": "Second panel-list line; defaults to distance·duration once resolved." }
+      ],
+      "notes": "Max 10 routes per URL (each costs the visitor one routing request). Requires network; offline links degrade to straight lines."
     },
     {
       "id": "area",

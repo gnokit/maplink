@@ -78,10 +78,10 @@ ${aliasLine}
 
 - ${enc.repeatable}
 - ${enc.fieldFormat}
-- Point drawables require \`lat\` and \`lng\`; path drawables require \`pts\`. Coordinates are \`lat,lng\`, separated by \`${enc.listSeparator}\`.
+- Point drawables require \`lat\` and \`lng\`; \`line\` / \`area\` require \`pts\`; \`route\` requires \`from\` and \`to\`. Coordinates are \`lat,lng\`, separated by \`${enc.listSeparator}\`.
 ${escapeLines}
 ${encodeLines}
-- Unknown keys are ignored, malformed entries are skipped, max ${enc.maxPerType} per type.
+- Unknown keys are ignored, malformed entries are skipped, max ${enc.maxPerType} per type (\`route\`: ${enc.maxRoutesPerType}, since each costs the visitor a routing request).
 
 ## Full documentation
 

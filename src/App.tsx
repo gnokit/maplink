@@ -24,6 +24,10 @@ maplibregl.setWorkerUrl(maplibreWorkerUrl)
 //   line=pts:{lat},{lng};…|color:{}|width:{}|opacity:{}|title:{}|body:{}|group:{}|subtitle:{}
 //   area=pts:{lat},{lng};…|color:{}|opacity:{}|outline:{}|title:{}|body:{}|group:{}|subtitle:{}
 //   circle=lat:{}|lng:{}|radius:{m}|color:{}|opacity:{}|title:{}|body:{}|group:{}|subtitle:{}
+//   route=from:{lat},{lng}|to:{lat},{lng}[|via:{lat},{lng};…]|profile:{drive|walk|bike}
+//     |color:{}|width:{}|opacity:{}|title:{}|body:{}|group:{}|subtitle:{}
+//     — resolved client-side against routing.openstreetmap.de (free, no key);
+//       falls back to a straight line if the request fails.
 //   center={lat}|{lng}  zoom={n}  style={bright|positron|liberty}
 //   title={panel heading}  panel={0|1}  group={initial chip}
 // Drawable fields also accept one-letter aliases (lat→a, lng→o, color→c, …) and
@@ -37,6 +41,9 @@ const MAX_VALUE_CHARS = 20000
 const MAX_POINTS = 2000
 const MAX_SCALE = 5
 const MAX_RADIUS_M = 10_000_000
+// Routes each cost a network request at view time, so cap them far below
+// the generic MAX_PER_TYPE=100 self-DoS guard.
+const MAX_ROUTES = 10
 
 type DrawMarker = {
   lat: number
@@ -92,6 +99,38 @@ type DrawCircle = {
   lng: number
   radius: number
   color?: string
+  opacity?: number
+  title?: string
+  body?: string
+  group?: string
+  subtitle?: string
+}
+
+type LatLng = { lat: number; lng: number }
+type RouteProfile = 'drive' | 'walk' | 'bike'
+
+// profile spelling → OSRM instance (routing.openstreetmap.de).
+const ROUTE_PROFILES: Record<string, RouteProfile> = {
+  drive: 'drive',
+  car: 'drive',
+  walk: 'walk',
+  foot: 'walk',
+  bike: 'bike',
+  bicycle: 'bike',
+}
+const PROFILE_EMOJI: Record<RouteProfile, string> = {
+  drive: '🚗',
+  walk: '🚶',
+  bike: '🚴',
+}
+
+type DrawRoute = {
+  from: LatLng
+  to: LatLng
+  via: LatLng[]
+  profile: RouteProfile
+  color?: string
+  width?: number
   opacity?: number
   title?: string
   body?: string
@@ -269,12 +308,47 @@ function parseCircle(item: string): DrawCircle | undefined {
   return circle
 }
 
+// `lat,lng` with optional surrounding whitespace (e.g. `from:22.3152,114.1818`).
+function parseLatLngPair(s: string | undefined): LatLng | undefined {
+  if (!s) return undefined
+  const [latRaw, lngRaw] = s.split(',')
+  return latLng(latRaw?.trim(), lngRaw?.trim())
+}
+
+function parseRoute(item: string): DrawRoute | undefined {
+  const kv = parseKV(item)
+  const from = parseLatLngPair(kv.from)
+  const to = parseLatLngPair(kv.to)
+  if (!from || !to) return undefined
+  const profile = ROUTE_PROFILES[(kv.profile ?? '').toLowerCase()] ?? 'drive'
+  const via: LatLng[] = []
+  if (kv.via) {
+    for (const chunk of splitEscaped(kv.via, ';')) {
+      if (via.length >= MAX_POINTS) break
+      const ll = parseLatLngPair(chunk)
+      if (ll) via.push(ll)
+    }
+  }
+  const r: DrawRoute = { from, to, via, profile }
+  if (kv.color) r.color = cssColor(kv.color)
+  const width = num(kv.width)
+  if (width !== undefined && width > 0) r.width = width
+  const opacity = num(kv.opacity)
+  if (opacity !== undefined && opacity >= 0 && opacity <= 1) r.opacity = opacity
+  if (kv.title) r.title = kv.title
+  if (kv.body) r.body = kv.body
+  if (kv.group) r.group = kv.group
+  if (kv.subtitle) r.subtitle = kv.subtitle
+  return r
+}
+
 type DrawableSet = {
   markers: DrawMarker[]
   popups: DrawPopup[]
   lines: DrawLine[]
   areas: DrawArea[]
   circles: DrawCircle[]
+  routes: DrawRoute[]
   center?: [number, number]
   zoom?: number
   style: string
@@ -284,18 +358,23 @@ type DrawableSet = {
   initialGroup?: string
 }
 
-// Demo content shown when the URL carries no drawables. It exercises every
-// primitive — markers, a standalone popup, a route, a zone and a radius ring —
-// plus groups so the panel's chip filtering is demonstrated too.
+// Demo content shown when the URL carries no drawables. It exercises the three
+// core primitives — grouped markers, a live street route and a radius ring —
+// with one group each so the panel's chip filtering is demonstrated too. The
+// route costs one OSRM request at view time; offline it stays a straight line.
 const DEMO: {
   markers: DrawMarker[]
   popups: DrawPopup[]
   lines: DrawLine[]
   areas: DrawArea[]
   circles: DrawCircle[]
+  routes: DrawRoute[]
   panelTitle: string
 } = {
-  panelTitle: '維港漫步 · 示範地圖',
+  panelTitle: '維港地圖 · 示範',
+  popups: [],
+  lines: [],
+  areas: [],
   markers: [
     {
       lat: 22.2939,
@@ -307,33 +386,6 @@ const DEMO: {
       body: '尖沙咀 ⇄ 中環 · 港內渡輪\n示範：地圖標記（emoji + 分組）',
     },
     {
-      lat: 22.2937,
-      lng: 114.1703,
-      emoji: '🏛️',
-      color: '#7c3aed',
-      group: '景點',
-      title: '香港文化中心',
-      body: '示範：地圖標記',
-    },
-    {
-      lat: 22.2977,
-      lng: 114.1696,
-      emoji: '🛍️',
-      color: '#7c3aed',
-      group: '景點',
-      title: '海港城',
-      body: '購物中心\n示範：地圖標記',
-    },
-    {
-      lat: 22.295,
-      lng: 114.1728,
-      emoji: '🌃',
-      color: '#7c3aed',
-      group: '景點',
-      title: '星光大道',
-      body: '示範：地圖標記',
-    },
-    {
       lat: 22.2978,
       lng: 114.172,
       emoji: '🍜',
@@ -343,43 +395,15 @@ const DEMO: {
       body: '示範：地圖標記',
     },
   ],
-  popups: [
+  routes: [
     {
-      lat: 22.29,
-      lng: 114.165,
-      title: '維多利亞港',
-      body: '示範：獨立彈出標籤（無地圖標記）',
-    },
-  ],
-  lines: [
-    {
-      // pts are [lng, lat] pairs, like GeoJSON coordinates.
-      pts: [
-        [114.1694, 22.2939],
-        [114.1703, 22.2948],
-        [114.1728, 22.295],
-        [114.174, 22.297],
-      ],
-      color: '#e11d48',
-      width: 4,
+      from: { lat: 22.2939, lng: 114.1694 },
+      via: [{ lat: 22.295, lng: 114.1728 }],
+      to: { lat: 22.2978, lng: 114.172 },
+      profile: 'drive',
       group: '路線',
-      title: '海濱漫步路線',
-      body: '天星碼頭 → 文化中心 → 星光大道 → 尖東（約 1.2 公里）\n示範：路線 / 路徑',
-    },
-  ],
-  areas: [
-    {
-      pts: [
-        [114.168, 22.292],
-        [114.168, 22.2965],
-        [114.175, 22.2965],
-        [114.175, 22.292],
-      ],
-      color: '#2563eb',
-      opacity: 0.15,
-      group: '範圍',
-      title: '尖沙咀海濱長廊',
-      body: '示範：多邊形範圍 / 區域',
+      title: '駕車示範路線',
+      body: '天星碼頭 → 星光大道 → 一蘭拉麵\n示範：真實街道路徑',
     },
   ],
   circles: [
@@ -417,6 +441,8 @@ function parseDrawables(search: string): DrawableSet {
   const lines = take(['line'], parseLine)
   const areas = take(['area'], parseArea)
   const circles = take(['circle'], parseCircle)
+  // Each route costs a network request, so the take() cap is applied twice.
+  const routes = take(['route'], parseRoute).slice(0, MAX_ROUTES)
 
   let center: [number, number] | undefined
   const centerRaw = params.get('center')
@@ -436,10 +462,11 @@ function parseDrawables(search: string): DrawableSet {
     popups.length > 0 ||
     lines.length > 0 ||
     areas.length > 0 ||
-    circles.length > 0
+    circles.length > 0 ||
+    routes.length > 0
 
   const drawables = hasUrlDrawables
-    ? { markers, popups, lines, areas, circles }
+    ? { markers, popups, lines, areas, circles, routes }
     : DEMO
 
   const allDrawables: Array<{ title?: string; group?: string }> = [
@@ -448,6 +475,7 @@ function parseDrawables(search: string): DrawableSet {
     ...drawables.lines,
     ...drawables.areas,
     ...drawables.circles,
+    ...drawables.routes,
   ]
   const hasTitles = allDrawables.some((d) => d.title || d.group)
 
@@ -463,6 +491,7 @@ function parseDrawables(search: string): DrawableSet {
     lines: drawables.lines,
     areas: drawables.areas,
     circles: drawables.circles,
+    routes: drawables.routes,
     center,
     zoom,
     style,
@@ -495,6 +524,33 @@ function circleRing(lng: number, lat: number, radiusM: number, steps = 64): Arra
   }
   ring.push(ring[0])
   return ring
+}
+
+// OSRM instance + endpoint profile for a parsed route, against OSM's public
+// routers: free, no key. Per-request path segment matches the loaded profile.
+function routeUrl(r: DrawRoute): string {
+  const [instance, path] =
+    r.profile === 'walk'
+      ? ['routed-foot', 'foot']
+      : r.profile === 'bike'
+        ? ['routed-bike', 'bike']
+        : ['routed-car', 'driving']
+  const coords = [r.from, ...r.via, r.to]
+    .slice(0, MAX_POINTS)
+    .map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`)
+    .join(';')
+  return `https://routing.openstreetmap.de/${instance}/route/v1/${path}/${coords}?overview=full&geometries=geojson&alternatives=false&steps=false`
+}
+
+function fmtDistance(m: number): string {
+  if (m >= 1000) return m >= 10000 ? `${Math.round(m / 1000)} 公里` : `${(m / 1000).toFixed(1)} 公里`
+  return `${Math.round(m)} 米`
+}
+
+function fmtDuration(s: number): string {
+  const min = Math.max(1, Math.round(s / 60))
+  if (min < 60) return `${min} 分鐘`
+  return `${Math.floor(min / 60)} 小時 ${min % 60} 分鐘`
 }
 
 function escapeHtml(s: string): string {
@@ -646,7 +702,27 @@ function buildItems(draw: DrawableSet): PanelItem[] {
     })
   })
 
+  draw.routes.forEach((r, i) => {
+    items.push({
+      key: `r-${i}`,
+      title: r.title || `${PROFILE_LABEL[r.profile]}路線 ${i + 1}`,
+      subtitle: r.subtitle ?? firstLine(r.body),
+      color: r.color ?? DEFAULTS.route.color,
+      emoji: PROFILE_EMOJI[r.profile],
+      group: r.group,
+      lng: (r.from.lng + r.to.lng) / 2,
+      lat: (r.from.lat + r.to.lat) / 2,
+      html: popupHtml(r.title, r.body, PROFILE_EMOJI[r.profile]),
+    })
+  })
+
   return items
+}
+
+const PROFILE_LABEL: Record<RouteProfile, string> = {
+  drive: '駕車',
+  walk: '步行',
+  bike: '單車',
 }
 
 function buildPanel(opts: {
@@ -658,7 +734,7 @@ function buildPanel(opts: {
   markerEls: Groupable[]
   popupEls: Groupable[]
   open: boolean
-}): { root: HTMLElement; applyGroup: (g: string | null) => void; destroy: () => void } {
+}): { root: HTMLElement; applyGroup: (g: string | null) => void; setRowSubtitle: (key: string, text: string) => void; destroy: () => void } {
   const { map } = opts
 
   const root = document.createElement('div')
@@ -743,6 +819,7 @@ function buildPanel(opts: {
       btn.appendChild(trail)
     }
     btn.addEventListener('click', () => focusItem(it, btn))
+    btn.dataset.maplinkKey = it.key
     li.appendChild(btn)
     list.appendChild(li)
     rows.push({ li, item: it })
@@ -836,6 +913,21 @@ function buildPanel(opts: {
   return {
     root,
     applyGroup,
+    // Routes resolve their distance/duration after the panel exists; patch the
+    // matching row's subtitle (and title span, if the row had none).
+    setRowSubtitle(key, text) {
+      const btn = root.querySelector<HTMLButtonElement>(`.maplink-row[data-maplink-key="${CSS.escape(key)}"]`)
+      if (!btn) return
+      let sub = btn.querySelector('.maplink-row__sub')
+      if (!sub) {
+        const textEl = btn.querySelector('.maplink-row__text')
+        if (!textEl) return
+        sub = document.createElement('span')
+        sub.className = 'maplink-row__sub'
+        textEl.appendChild(sub)
+      }
+      sub.textContent = text
+    },
     destroy() {
       if (focusPopup) focusPopup.remove()
       root.remove()
@@ -925,6 +1017,65 @@ function App() {
     if (panel) overlay.appendChild(panel.root)
     const panelPaddingLeft = panel && draw.panelOpen ? 340 : 80
 
+    // Route resolution happens off the main URL parse: the shared GeoJSON
+    // source holds straight endpoint lines until each OSRM response lands.
+    // StrictMode double-mount gets one request set per mount; cleanup aborts.
+    const controllers: AbortController[] = []
+    // Assigned inside map.on('load'); resolveRoutes (declared in this scope)
+    // touches them once the responses land.
+    let routeGeom: Array<{ group?: string; pts: Array<[number, number]> }> = []
+    let autoFit = () => {}
+
+    function resolveRoutes(routes: DrawRoute[], featureIdx: number[], featureList: GJFeature[]) {
+      function applyFeatures() {
+        map.getSource<maplibregl.GeoJSONSource>('maplink-draw')?.setData({
+          type: 'FeatureCollection',
+          features: featureList,
+        } as never)
+      }
+      let anyResolved = false
+      const jobs = routes.map((r, i) => {
+        const ctrl = new AbortController()
+        controllers.push(ctrl)
+        return fetch(routeUrl(r), { signal: ctrl.signal })
+          .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`route API ${res.status}`))))
+          .then(
+            (
+              json: {
+                routes?: Array<{
+                  distance: number
+                  duration: number
+                  geometry?: { coordinates?: Array<[number, number]> }
+                }>
+              },
+            ) => {
+              const route = json.routes?.[0]
+              const coords = route?.geometry?.coordinates
+              if (!route || !coords || coords.length < 2) throw new Error('no route geometry')
+              const f = featureList[featureIdx[i]]
+              f.geometry = { type: 'LineString', coordinates: coords }
+              const metrics = `📏 ${fmtDistance(route.distance)} · ⏱ ${fmtDuration(route.duration)}`
+              f.properties.body = r.body ? `${r.body}\n${metrics}` : metrics
+              routeGeom[i] = { group: r.group, pts: coords }
+              if (!r.subtitle && !r.body) panel?.setRowSubtitle(`r-${i}`, metrics)
+              anyResolved = true
+              applyFeatures()
+            },
+          )
+          .catch((err: unknown) => {
+            if ((err as Error)?.name === 'AbortError') return
+            console.warn(
+              `maplink: route ${i + 1} could not be resolved — leaving the straight line fallback`,
+              err,
+            )
+          })
+      })
+      // Auto-refit once all responses are in, so the fit includes street bends.
+      Promise.allSettled(jobs).then(() => {
+        if (anyResolved) autoFit()
+      })
+    }
+
     map.on('load', () => {
       // Lines + areas (+ radius circles as polygons) share one GeoJSON source,
       // with layers filtered by geometry type and styled per-feature.
@@ -971,6 +1122,32 @@ function App() {
           },
         })
       }
+      // Routes are placeholders until the router responds: start as a straight
+      // endpoint line, swap in the resolved street geometry (with distance /
+      // duration) when it arrives, and keep the straight line if it never does.
+      const routeFeatureIdx: number[] = []
+      draw.routes.forEach((r) => {
+        routeFeatureIdx.push(features.length)
+        features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [r.from.lng, r.from.lat],
+              ...r.via.map<[number, number]>((p) => [p.lng, p.lat]),
+              [r.to.lng, r.to.lat],
+            ],
+          },
+          properties: {
+            color: r.color ?? DEFAULTS.route.color,
+            width: r.width ?? DEFAULTS.route.width,
+            opacity: r.opacity ?? DEFAULTS.route.opacity,
+            title: r.title ?? null,
+            body: r.body ?? null,
+            group: r.group ?? null,
+          },
+        })
+      })
       if (features.length > 0) {
         map.addSource('maplink-draw', {
           type: 'geojson',
@@ -1063,8 +1240,20 @@ function App() {
       // The layers exist now, so sync the panel's initial group filter.
       panel?.applyGroup(initialGroup ?? null)
 
-      // Auto-fit everything unless the URL pins the view.
-      if (!draw.center && !draw.zoom) {
+      // Auto-fit everything unless the URL pins the view. Called again after
+      // routes resolve, so the fit can widen to the real street geometry.
+      routeGeom = draw.routes.map(
+        (r) => ({
+          group: r.group,
+          pts: [
+            [r.from.lng, r.from.lat] as [number, number],
+            ...r.via.map((p) => [p.lng, p.lat] as [number, number]),
+            [r.to.lng, r.to.lat],
+          ],
+        }),
+      )
+      autoFit = () => {
+        if (draw.center || draw.zoom) return
         const bounds = new maplibregl.LngLatBounds()
         let has = false
         const inGroup = (g: string | undefined) => !initialGroup || g === initialGroup
@@ -1084,6 +1273,10 @@ function App() {
           if (!inGroup(c.group)) continue
           for (const [lng, lat] of circleRing(c.lng, c.lat, c.radius, 16)) extend(lng, lat)
         }
+        for (const rg of routeGeom) {
+          if (!inGroup(rg.group)) continue
+          for (const [lng, lat] of rg.pts) extend(lng, lat)
+        }
         if (has) {
           map.fitBounds(bounds, {
             padding: { top: 80, right: 80, bottom: 80, left: panelPaddingLeft },
@@ -1092,9 +1285,13 @@ function App() {
           })
         }
       }
+      autoFit()
+
+      if (draw.routes.length > 0) resolveRoutes(draw.routes, routeFeatureIdx, features)
     })
 
     return () => {
+      for (const c of controllers) c.abort()
       panel?.destroy()
       for (const m of markers) m.remove()
       for (const p of popups) p.remove()
