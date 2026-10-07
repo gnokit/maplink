@@ -284,59 +284,117 @@ type DrawableSet = {
   initialGroup?: string
 }
 
-// Fallback data (Ho Man Tin parkings) when the URL carries no drawables.
-const FALLBACK_MARKERS: DrawMarker[] = [
-  {
-    lat: 22.315203,
-    lng: 114.181846,
-    label: '1',
-    emoji: '🏢',
-    color: '#2563eb',
-    group: '停車場',
-    title: '何文田停車場（何文田廣場）',
-    body: '空位：🟢 30\n更新：14:05\n限高 1.8 米',
-  },
-  {
-    lat: 22.316543,
-    lng: 114.183219,
-    label: '2',
-    emoji: '🅿️',
-    color: '#16a34a',
-    group: '咪錶',
-    title: '常樂街咪錶（近常盛街）',
-    body: '空位：🟢 13／19\n更新：14:02\n$4／15 分鐘，最長 2 小時',
-  },
-  {
-    lat: 22.312133,
-    lng: 114.180687,
-    label: '3',
-    emoji: '🏢',
-    color: '#2563eb',
-    group: '停車場',
-    title: '何文田體育館停車場',
-    body: '空位：🟢 21\n更新：14:03\n限高 2.45 米；首 2 小時 $5.6／半小時，之後 $8.4／半小時',
-  },
-  {
-    lat: 22.311276,
-    lng: 114.179285,
-    label: '4',
-    emoji: '🏢',
-    color: '#2563eb',
-    group: '停車場',
-    title: '愛民停車場（愛民廣場）',
-    body: '空位：🟢 30\n更新：14:05\n限高 2 米',
-  },
-  {
-    lat: 22.31581,
-    lng: 114.186481,
-    label: '5',
-    emoji: '🅿️',
-    color: '#16a34a',
-    group: '咪錶',
-    title: '靠背壟道咪錶（近浙江街）',
-    body: '空位：🟢 16／78\n更新：14:05\n$4／15 分鐘，最長 2 小時',
-  },
-]
+// Demo content shown when the URL carries no drawables. It exercises every
+// primitive — markers, a standalone popup, a route, a zone and a radius ring —
+// plus groups so the panel's chip filtering is demonstrated too.
+const DEMO: {
+  markers: DrawMarker[]
+  popups: DrawPopup[]
+  lines: DrawLine[]
+  areas: DrawArea[]
+  circles: DrawCircle[]
+  panelTitle: string
+} = {
+  panelTitle: '維港漫步 · 示範地圖',
+  markers: [
+    {
+      lat: 22.2939,
+      lng: 114.1694,
+      emoji: '🚢',
+      color: '#2563eb',
+      group: '交通',
+      title: '天星小輪碼頭',
+      body: '尖沙咀 ⇄ 中環 · 港內渡輪\n示範：地圖標記（emoji + 分組）',
+    },
+    {
+      lat: 22.2937,
+      lng: 114.1703,
+      emoji: '🏛️',
+      color: '#7c3aed',
+      group: '景點',
+      title: '香港文化中心',
+      body: '示範：地圖標記',
+    },
+    {
+      lat: 22.2977,
+      lng: 114.1696,
+      emoji: '🛍️',
+      color: '#7c3aed',
+      group: '景點',
+      title: '海港城',
+      body: '購物中心\n示範：地圖標記',
+    },
+    {
+      lat: 22.295,
+      lng: 114.1728,
+      emoji: '🌃',
+      color: '#7c3aed',
+      group: '景點',
+      title: '星光大道',
+      body: '示範：地圖標記',
+    },
+    {
+      lat: 22.2978,
+      lng: 114.172,
+      emoji: '🍜',
+      color: '#ea580c',
+      group: '美食',
+      title: '一蘭拉麵（尖沙咀）',
+      body: '示範：地圖標記',
+    },
+  ],
+  popups: [
+    {
+      lat: 22.29,
+      lng: 114.165,
+      title: '維多利亞港',
+      body: '示範：獨立彈出標籤（無地圖標記）',
+    },
+  ],
+  lines: [
+    {
+      // pts are [lng, lat] pairs, like GeoJSON coordinates.
+      pts: [
+        [114.1694, 22.2939],
+        [114.1703, 22.2948],
+        [114.1728, 22.295],
+        [114.174, 22.297],
+      ],
+      color: '#e11d48',
+      width: 4,
+      group: '路線',
+      title: '海濱漫步路線',
+      body: '天星碼頭 → 文化中心 → 星光大道 → 尖東（約 1.2 公里）\n示範：路線 / 路徑',
+    },
+  ],
+  areas: [
+    {
+      pts: [
+        [114.168, 22.292],
+        [114.168, 22.2965],
+        [114.175, 22.2965],
+        [114.175, 22.292],
+      ],
+      color: '#2563eb',
+      opacity: 0.15,
+      group: '範圍',
+      title: '尖沙咀海濱長廊',
+      body: '示範：多邊形範圍 / 區域',
+    },
+  ],
+  circles: [
+    {
+      lat: 22.2939,
+      lng: 114.1694,
+      radius: 500,
+      color: '#16a34a',
+      opacity: 0.15,
+      group: '範圍',
+      title: '5 分鐘步行圈',
+      body: '以天星碼頭為圓心 · 半徑 500 米\n示範：半徑範圍圈',
+    },
+  ],
+}
 
 function parseDrawables(search: string): DrawableSet {
   const params = new URLSearchParams(search)
@@ -380,28 +438,31 @@ function parseDrawables(search: string): DrawableSet {
     areas.length > 0 ||
     circles.length > 0
 
-  const activeMarkers = hasUrlDrawables ? markers : FALLBACK_MARKERS
+  const drawables = hasUrlDrawables
+    ? { markers, popups, lines, areas, circles }
+    : DEMO
+
   const allDrawables: Array<{ title?: string; group?: string }> = [
-    ...activeMarkers,
-    ...popups,
-    ...lines,
-    ...areas,
-    ...circles,
+    ...drawables.markers,
+    ...drawables.popups,
+    ...drawables.lines,
+    ...drawables.areas,
+    ...drawables.circles,
   ]
   const hasTitles = allDrawables.some((d) => d.title || d.group)
 
   const panelParam = params.get('panel')
-  const panelTitle = params.get('title') || undefined
+  const panelTitle = hasUrlDrawables ? params.get('title') || undefined : DEMO.panelTitle
   const initialGroup = params.get('group') || undefined
   const hasPanel = hasTitles || panelParam === '1'
   const panelOpen = panelParam === '1' ? true : panelParam === '0' ? false : hasTitles
 
   return {
-    markers: activeMarkers,
-    popups,
-    lines,
-    areas,
-    circles,
+    markers: drawables.markers,
+    popups: drawables.popups,
+    lines: drawables.lines,
+    areas: drawables.areas,
+    circles: drawables.circles,
     center,
     zoom,
     style,

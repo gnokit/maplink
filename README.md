@@ -36,8 +36,9 @@ npm run dev      # http://localhost:5173/
 npm run build    # type-check + production build
 ```
 
-With no params at all, the map falls back to five built-in Ho Man Tin parking
-markers as a demo.
+With no params at all, the map falls back to a built-in Victoria Harbour demo
+that showcases every primitive at once — markers, a standalone popup, a walking
+route, a zone and a radius ring — with grouped categories in the panel.
 
 ## 📖 URL API
 
