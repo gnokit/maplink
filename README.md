@@ -24,8 +24,8 @@ string to append to that URL.
 ## 📷 Real links
 
 <figure>
-  <img src="screenshots/bus45.webp" alt="Kowloon Motor Bus route 45: the panel lists 40+ stops while the map draws the red bus path and numbered stop pins" width="49%">
-  <img src="screenshots/estates-dark.webp" alt="50+ Hong Kong public housing estates as grouped circle markers on the dark map, with district chips and a legend in the panel" width="49%" align="right">
+  <img src="docs/screenshots/bus45.webp" alt="Kowloon Motor Bus route 45: the panel lists 40+ stops while the map draws the red bus path and numbered stop pins" width="49%">
+  <img src="docs/screenshots/estates-dark.webp" alt="50+ Hong Kong public housing estates as grouped circle markers on the dark map, with district chips and a legend in the panel" width="49%" align="right">
 </figure>
 
 Left: a KMB route 45 bus map — one stop per marker (40+ pins) plus one line for
