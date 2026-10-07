@@ -24,23 +24,33 @@ string to append to that URL.
 ## 📷 Real links
 
 <figure>
-  <img src="docs/screenshots/harry-potter-libraries.webp" alt="Kowloon public libraries grouped by 推薦 (recommended, starred) vs 其他, each pin labelled with the Harry Potter Chinese-edition volumes it holds (e.g. 2,3,4,5,6,7), panel rows trailing their volume list" width="49%">
-  <img src="docs/screenshots/bus45.webp" alt="Kowloon Motor Bus route 45: the panel lists 40+ stops while the map draws the red bus path and numbered stop pins" width="49%">
+  <img src="docs/screenshots/harry-potter-libraries.webp" alt="Kowloon public libraries grouped by 推薦 (recommended, starred) vs 其他, each pin labelled with the Harry Potter Chinese-edition volumes it holds (e.g. 2,3,4,5,6,7), panel rows trailing their volume list" width="720">
+  <figcaption>
+    <strong>哈利波特中文版 · 架上地圖</strong> — public libraries that stock the
+    Chinese edition, grouped 推薦 (starred, full set) vs 其他. Each numbered pin
+    (<code>label:</code>) tells at a glance which volumes that library holds,
+    and panel rows trail their full volume list.
+  </figcaption>
 </figure>
 
 <figure>
-  <img src="docs/screenshots/estates-dark.webp" alt="50+ Hong Kong public housing estates as grouped circle markers on the dark map, with district chips and a legend in the panel" width="99%">
+  <img src="docs/screenshots/bus45.webp" alt="Kowloon Motor Bus route 45: the panel lists 40+ stops while the map draws the red bus path and numbered stop pins" width="720">
+  <figcaption>
+    <strong>九巴 45 號路線</strong> — one stop per marker (40+ pins) plus one
+    line for the bus path; the panel lists every stop and the 去程 chip keeps
+    it tidy.
+  </figcaption>
 </figure>
 
-Top left: a "Harry Potter (Chinese edition) on the shelf" map — Kowloon public
-libraries grouped 推薦 / 其他 (starred = has all 7 volumes), each numbered pin
-telling at a glance which volumes that library holds (labels from `label:`).
-Top right: a KMB route 45 bus map — one stop per marker (40+ pins) plus one
-line for the bus path; the panel lists every stop and the 去程 chip keeps it
-tidy. Bottom: 50+ Hong Kong public housing estates grouped by district — past
-the 50-pin limit they render as a GPU circle layer; the district chips + legend
-filter both the list and the map, and the dark palette follows
-`prefers-color-scheme`.
+<figure>
+  <img src="docs/screenshots/estates-dark.webp" alt="50+ Hong Kong public housing estates as grouped circle markers on the dark map, with district chips and a legend in the panel" width="720">
+  <figcaption>
+    <strong>九龍公共屋邨</strong> — 50+ estates grouped by district. Past the
+    50-pin limit they render as a GPU circle layer; the district chips + legend
+    filter both the list and the map, and the dark palette follows
+    <code>prefers-color-scheme</code>.
+  </figcaption>
+</figure>
 
 ## ✨ Why it's nice
 
