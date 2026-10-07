@@ -21,6 +21,20 @@ That link drops a parking pin and shades a 500 m walking ring around it. Swap
 `maplink.app` for wherever you deploy — every example below is just a query
 string to append to that URL.
 
+## 📷 Real links
+
+<figure>
+  <img src="screenshots/bus45.webp" alt="Kowloon Motor Bus route 45: the panel lists 40+ stops while the map draws the red bus path and numbered stop pins" width="49%">
+  <img src="screenshots/estates-dark.webp" alt="50+ Hong Kong public housing estates as grouped circle markers on the dark map, with district chips and a legend in the panel" width="49%" align="right">
+</figure>
+
+Left: a KMB route 45 bus map — one stop per marker (40+ pins) plus one line for
+the bus path; the panel lists every stop and the 去程 chip keeps it tidy.
+Right: 50+ Hong Kong public housing estates grouped by district — past the
+50-pin limit they render as a GPU circle layer; the district chips + legend
+filter both the list and the map, and the dark palette follows
+`prefers-color-scheme`.
+
 ## ✨ Why it's nice
 
 - **Link = state.** Reload, bookmark, share or embed it — the map comes back identical.
