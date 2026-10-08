@@ -30,7 +30,10 @@ const aliasPart = (d) =>
   d.aliases && d.aliases.length ? ` (alias ${d.aliases.map((a) => `\`${a}\``).join(', ')})` : ''
 
 const drawableLines = schema.drawables
-  .map((d) => `- \`${d.key}\`${aliasPart(d)} \u2014 ${d.description} Required: ${d.required.join(', ')}.`)
+  .map((d) => {
+    const req = d.required && d.required.length ? ` Required: ${d.required.join(', ')}.` : ''
+    return `- \`${d.key}\`${aliasPart(d)} \u2014 ${d.description}${req}`
+  })
   .join('\n')
 
 const aliasLine = Object.entries(schema.fieldAliases)
@@ -79,6 +82,7 @@ ${aliasLine}
 - ${enc.repeatable}
 - ${enc.fieldFormat}
 - Point drawables require \`lat\` and \`lng\`; \`line\` / \`area\` require \`pts\`; \`route\` requires \`from\` and \`to\`. Coordinates are \`lat,lng\`, separated by \`${enc.listSeparator}\`.
+- \`json={GeoJSON}\` is a raw passthrough: the whole value must be percent-encoded (\`encodeURIComponent\`) and it bypasses the \`key:value\` grammar — no panel/group/popup. Repeatable.
 ${escapeLines}
 ${encodeLines}
 - Unknown keys are ignored, malformed entries are skipped, max ${enc.maxPerType} per type (\`route\`: ${enc.maxRoutesPerType}, since each costs the visitor a routing request).

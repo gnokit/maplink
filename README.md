@@ -85,6 +85,7 @@ walking ring.
 - **Limit** — 100 entries per type (`route`: 10, since each costs the visitor a routing request).
 - **Escaping** — write a literal separator as `\|` or `\:`. Popup text is HTML-escaped.
 - **Encoding** — non-ASCII just works; only `#` → `%23` and newline → `%0A` need hand-encoding.
+- **GeoJSON passthrough** — `json` takes a whole URL-encoded GeoJSON document instead of `key:value` fields (see [section 7](#7-raw-geojson--json)).
 
 ### Short field names
 
@@ -309,6 +310,33 @@ circle=lat:{}|lng:{}|radius:{m}|color:{}|opacity:{}|title:{}|body:{}
 ?circle=lat:22.315203|lng:114.181846|radius:500|color:%2316a34a|opacity:0.15|title:5 分鐘步行圈
 ```
 
+### 7. Raw GeoJSON — `json`
+
+A direct GeoJSON passthrough. Instead of the `key:value` grammar, `json` takes a
+whole **URL-encoded** GeoJSON document and hands its features straight to a
+MapLibre `geojson` source — the escape hatch for geometry the drawables can't
+express (`MultiPoint`, `MultiLineString`, `MultiPolygon`, …).
+
+```text
+json={URL-encoded GeoJSON}
+```
+
+- Accepts a `Feature`, a `FeatureCollection` or a bare `Geometry`; `GeometryCollection`s are flattened.
+- Repeatable — multiple `json=` params merge.
+- Drawn with fixed paint, not the drawable fields: polygons get a fill + outline, lines a stroke, points a circle. Feature `properties` are preserved on the feature but do not change the styling.
+- It is deliberately **outside the panel / group / popup machinery**: no panel row, no category chips, no click popup.
+- The **whole value must be percent-encoded** (`encodeURIComponent`); coordinates are `[lng, lat]` per the GeoJSON spec.
+- Forgiving: invalid JSON, unsupported geometry, out-of-range coordinates and oversized documents are skipped. Cap: 20,000 chars per `json=` value.
+
+**A raw GeoJSON point** (this is `{"type":"Point","coordinates":[114.1694,22.2939]}`):
+
+```text
+?json=%7B%22type%22%3A%22Point%22%2C%22coordinates%22%3A%5B114.1694%2C22.2939%5D%7D
+```
+
+> Inline GeoJSON is bulky: browsers and hosts cap URL length well below what a
+> large data set needs. Keep `json` payloads small, or simplify the geometry.
+
 ---
 
 ### Putting it together
@@ -332,6 +360,11 @@ to OSM's public OSRM routers; resolved geometry and `📏 · ⏱` metrics replac
 placeholder (autorefit follows), while failures keep the straight line. Cleanup
 removes all markers, popups and layers on unmount and aborts in-flight route
 fetches — StrictMode-safe.
+
+`json` is a separate raw passthrough: each URL-encoded GeoJSON document is
+validated and added as its own `maplink-json` source with fixed-paint layers,
+bypassing the drawable grammar, panel and group filtering. It is included in the
+auto-fit bounds like any other drawable.
 
 The URL grammar and every default live in **`src/maplink.schema.json`**, imported by
 `src/App.tsx` via `src/schema.ts` so code and docs share one source of truth.

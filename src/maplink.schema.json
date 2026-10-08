@@ -22,6 +22,7 @@
     },
     "maxPerType": 100,
     "maxRoutesPerType": 10,
+    "maxJsonChars": 200000,
     "colorHex": "Hex colours may omit the leading '#': write color:2563eb instead of color:%232563eb."
   },
   "styles": {
@@ -239,6 +240,17 @@
         { "key": "group", "type": "string", "notes": "Category for panel chips/legend." },
         { "key": "subtitle", "type": "string", "notes": "Second panel-list line; defaults to first body line." }
       ]
+    },
+    {
+      "id": "json",
+      "key": "json",
+      "aliases": [],
+      "geometry": "Any GeoJSON",
+      "description": "Raw GeoJSON passthrough. Pass a URL-encoded Feature, FeatureCollection or bare Geometry; features go straight into a MapLibre geojson source and are drawn with fixed paint (Polygon fill + outline, LineString line, Point circle). Bypasses the key:value drawable grammar: no panel row, no group chips, no popups.",
+      "required": [],
+      "example": "?json=%7B%22type%22%3A%22Point%22%2C%22coordinates%22%3A%5B114.1694%2C22.2939%5D%7D",
+      "fields": [],
+      "notes": "The whole value must be percent-encoded (encodeURIComponent). Repeatable — multiple json= params merge. Coordinates are [lng,lat] per the GeoJSON spec. GeometryCollections are flattened. Malformed or oversized documents (see maxJsonChars) are skipped."
     }
   ],
   "sharedFieldNotes": {

@@ -28,6 +28,9 @@ maplibregl.setWorkerUrl(maplibreWorkerUrl)
 //     |color:{}|width:{}|opacity:{}|title:{}|body:{}|group:{}|subtitle:{}
 //     — resolved client-side against routing.openstreetmap.de (free, no key);
 //       falls back to a straight line if the request fails.
+//   json={URL-encoded GeoJSON} — raw passthrough (repeatable): Feature /
+//     FeatureCollection / bare Geometry → one MapLibre geojson source with fixed
+//     paint; no panel row, no group filtering, no popup.
 //   center={lat}|{lng}  zoom={n}  style={bright|positron|liberty}
 //   title={panel heading}  panel={0|1}  group={initial chip}
 // Drawable fields also accept one-letter aliases (lat→a, lng→o, color→c, …) and
@@ -44,6 +47,10 @@ const MAX_RADIUS_M = 10_000_000
 // Routes each cost a network request at view time, so cap them far below
 // the generic MAX_PER_TYPE=100 self-DoS guard.
 const MAX_ROUTES = 10
+// `?json=` carries a whole GeoJSON document in one value — bound its size and
+// its total coordinate count (feature count reuses MAX_PER_TYPE).
+const MAX_JSON_CHARS = 200_000
+const MAX_JSON_POINTS = 20_000
 
 type DrawMarker = {
   lat: number
@@ -143,6 +150,22 @@ type GJFeature = {
   geometry:
     | { type: 'LineString'; coordinates: Array<[number, number]> }
     | { type: 'Polygon'; coordinates: Array<Array<[number, number]>> }
+  properties: Record<string, unknown>
+}
+
+// Raw GeoJSON passthrough (`?json=`). Geometry types MapLibre's `$type` filter
+// understands; GeometryCollections are flattened into single-geometry features.
+type JsonGeometry =
+  | { type: 'Point'; coordinates: [number, number] }
+  | { type: 'MultiPoint'; coordinates: Array<[number, number]> }
+  | { type: 'LineString'; coordinates: Array<[number, number]> }
+  | { type: 'MultiLineString'; coordinates: Array<Array<[number, number]>> }
+  | { type: 'Polygon'; coordinates: Array<Array<[number, number]>> }
+  | { type: 'MultiPolygon'; coordinates: Array<Array<Array<[number, number]>>> }
+
+type JsonFeature = {
+  type: 'Feature'
+  geometry: JsonGeometry
   properties: Record<string, unknown>
 }
 
@@ -342,6 +365,200 @@ function parseRoute(item: string): DrawRoute | undefined {
   return r
 }
 
+// ---------------------------------------------------------------------------
+// Raw GeoJSON passthrough (`?json=`) — an addition, not part of the drawable
+// grammar. The document is translated straight into a MapLibre geojson source
+// and drawn with fixed paint: no panel row, no group filtering, no popup. The
+// value must be fully percent-encoded on the wire; malformed input is skipped.
+// ---------------------------------------------------------------------------
+
+type CoordBudget = { n: number }
+
+// A single [lng, lat] position, range-checked and charged to the shared budget.
+function normPosition(raw: unknown, budget: CoordBudget): [number, number] | undefined {
+  if (budget.n >= MAX_JSON_POINTS) return undefined
+  if (!Array.isArray(raw) || raw.length < 2) return undefined
+  const lng = Number(raw[0])
+  const lat = Number(raw[1])
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return undefined
+  if (lng < -180 || lng > 180 || lat < -90 || lat > 90) return undefined
+  budget.n++
+  return [lng, lat]
+}
+
+function normPositions(
+  raw: unknown,
+  budget: CoordBudget,
+  min: number,
+): Array<[number, number]> | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const out: Array<[number, number]> = []
+  for (const c of raw) {
+    const p = normPosition(c, budget)
+    if (!p) return undefined
+    out.push(p)
+  }
+  return out.length >= min ? out : undefined
+}
+
+// Close a polygon ring if the URL didn't repeat the first point.
+function normRing(raw: unknown, budget: CoordBudget): Array<[number, number]> | undefined {
+  const ring = normPositions(raw, budget, 3)
+  if (!ring) return undefined
+  const first = ring[0]
+  const last = ring[ring.length - 1]
+  if (first[0] !== last[0] || first[1] !== last[1]) ring.push([first[0], first[1]])
+  return ring
+}
+
+function normRings(
+  raw: unknown,
+  budget: CoordBudget,
+): Array<Array<[number, number]>> | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const rings: Array<Array<[number, number]>> = []
+  for (const ring of raw) {
+    const r = normRing(ring, budget)
+    if (!r) return undefined
+    rings.push(r)
+  }
+  return rings.length > 0 ? rings : undefined
+}
+
+function normGeometry(raw: unknown, budget: CoordBudget): JsonGeometry | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const g = raw as { type?: unknown; coordinates?: unknown }
+  switch (g.type) {
+    case 'Point': {
+      const c = normPosition(g.coordinates, budget)
+      return c ? { type: 'Point', coordinates: c } : undefined
+    }
+    case 'MultiPoint': {
+      const c = normPositions(g.coordinates, budget, 1)
+      return c ? { type: 'MultiPoint', coordinates: c } : undefined
+    }
+    case 'LineString': {
+      const c = normPositions(g.coordinates, budget, 2)
+      return c ? { type: 'LineString', coordinates: c } : undefined
+    }
+    case 'MultiLineString': {
+      if (!Array.isArray(g.coordinates)) return undefined
+      const lines: Array<Array<[number, number]>> = []
+      for (const line of g.coordinates) {
+        const l = normPositions(line, budget, 2)
+        if (!l) return undefined
+        lines.push(l)
+      }
+      return lines.length > 0 ? { type: 'MultiLineString', coordinates: lines } : undefined
+    }
+    case 'Polygon': {
+      const rings = normRings(g.coordinates, budget)
+      return rings ? { type: 'Polygon', coordinates: rings } : undefined
+    }
+    case 'MultiPolygon': {
+      if (!Array.isArray(g.coordinates)) return undefined
+      const polys: Array<Array<Array<[number, number]>>> = []
+      for (const poly of g.coordinates) {
+        const rings = normRings(poly, budget)
+        if (!rings) return undefined
+        polys.push(rings)
+      }
+      return polys.length > 0 ? { type: 'MultiPolygon', coordinates: polys } : undefined
+    }
+    default:
+      return undefined
+  }
+}
+
+// Walk a parsed document, flattening FeatureCollections + GeometryCollections
+// into single-geometry features. `depth` guards pathological nesting.
+function collectFeatures(
+  raw: unknown,
+  budget: CoordBudget,
+  out: JsonFeature[],
+  depth: number,
+): void {
+  if (!raw || typeof raw !== 'object' || out.length >= MAX_PER_TYPE || depth > 4) return
+  const node = raw as {
+    type?: unknown
+    geometry?: { type?: unknown; geometries?: unknown }
+    coordinates?: unknown
+    properties?: unknown
+    features?: unknown
+    geometries?: unknown
+  }
+  if (node.type === 'FeatureCollection') {
+    if (Array.isArray(node.features)) {
+      for (const f of node.features) collectFeatures(f, budget, out, depth + 1)
+    }
+    return
+  }
+  if (node.type === 'Feature') {
+    const props =
+      node.properties && typeof node.properties === 'object'
+        ? (node.properties as Record<string, unknown>)
+        : {}
+    if (node.geometry?.type === 'GeometryCollection') {
+      if (Array.isArray(node.geometry.geometries)) {
+        for (const g of node.geometry.geometries) {
+          collectFeatures({ type: 'Feature', geometry: g, properties: props }, budget, out, depth + 1)
+        }
+      }
+      return
+    }
+    const geom = normGeometry(node.geometry, budget)
+    if (geom) out.push({ type: 'Feature', geometry: geom, properties: props })
+    return
+  }
+  if (node.type === 'GeometryCollection') {
+    if (Array.isArray(node.geometries)) {
+      for (const g of node.geometries) {
+        collectFeatures({ type: 'Feature', geometry: g, properties: {} }, budget, out, depth + 1)
+      }
+    }
+    return
+  }
+  // Bare geometry.
+  const geom = normGeometry(node, budget)
+  if (geom) out.push({ type: 'Feature', geometry: geom, properties: {} })
+}
+
+// `?json=` is repeatable; multiple documents merge under one coordinate budget.
+function parseJson(raws: string[]): JsonFeature[] {
+  const out: JsonFeature[] = []
+  const budget: CoordBudget = { n: 0 }
+  for (const raw of raws) {
+    if (!raw) continue
+    if (raw.length > MAX_JSON_CHARS) {
+      console.warn(`maplink: json= exceeds ${MAX_JSON_CHARS} chars — skipped`)
+      continue
+    }
+    let doc: unknown
+    try {
+      doc = JSON.parse(raw)
+    } catch {
+      console.warn('maplink: json= is not valid JSON — skipped')
+      continue
+    }
+    collectFeatures(doc, budget, out, 0)
+    if (out.length >= MAX_PER_TYPE) break
+  }
+  return out
+}
+
+// Visit every [lng, lat] position in a parsed geometry (for bounding box calc).
+function eachCoord(geom: JsonGeometry, cb: (lng: number, lat: number) => void): void {
+  const walk = (node: unknown): void => {
+    if (!Array.isArray(node)) return
+    if (typeof node[0] === 'number' && typeof node[1] === 'number') {
+      cb(node[0], node[1])
+      return
+    }
+    for (const child of node) walk(child)
+  }
+  walk(geom.coordinates)
+}
+
 type DrawableSet = {
   markers: DrawMarker[]
   popups: DrawPopup[]
@@ -349,6 +566,7 @@ type DrawableSet = {
   areas: DrawArea[]
   circles: DrawCircle[]
   routes: DrawRoute[]
+  json: JsonFeature[]
   center?: [number, number]
   zoom?: number
   style: string
@@ -443,6 +661,8 @@ function parseDrawables(search: string): DrawableSet {
   const circles = take(['circle'], parseCircle)
   // Each route costs a network request, so the take() cap is applied twice.
   const routes = take(['route'], parseRoute).slice(0, MAX_ROUTES)
+  // Raw GeoJSON passthrough — independent of the drawable grammar/panel.
+  const json = parseJson(params.getAll('json'))
 
   let center: [number, number] | undefined
   const centerRaw = params.get('center')
@@ -463,7 +683,8 @@ function parseDrawables(search: string): DrawableSet {
     lines.length > 0 ||
     areas.length > 0 ||
     circles.length > 0 ||
-    routes.length > 0
+    routes.length > 0 ||
+    json.length > 0
 
   const drawables = hasUrlDrawables
     ? { markers, popups, lines, areas, circles, routes }
@@ -492,6 +713,7 @@ function parseDrawables(search: string): DrawableSet {
     areas: drawables.areas,
     circles: drawables.circles,
     routes: drawables.routes,
+    json,
     center,
     zoom,
     style,
@@ -1237,6 +1459,55 @@ function App() {
         })
       }
 
+      // Raw GeoJSON passthrough: one source, fixed-paint layers per geometry
+      // type. Intentionally outside the panel/group/popup machinery — a direct
+      // translation of the document into MapLibre.
+      if (draw.json.length > 0) {
+        map.addSource('maplink-json', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: draw.json } as never,
+        })
+        map.addLayer({
+          id: 'maplink-json-area',
+          type: 'fill',
+          source: 'maplink-json',
+          filter: ['==', '$type', 'Polygon'],
+          paint: {
+            'fill-color': DEFAULTS.area.color,
+            'fill-opacity': DEFAULTS.area.opacity,
+          },
+        })
+        map.addLayer({
+          id: 'maplink-json-area-outline',
+          type: 'line',
+          source: 'maplink-json',
+          filter: ['==', '$type', 'Polygon'],
+          paint: { 'line-color': DEFAULTS.area.color, 'line-width': 2 },
+        })
+        map.addLayer({
+          id: 'maplink-json-line',
+          type: 'line',
+          source: 'maplink-json',
+          filter: ['==', '$type', 'LineString'],
+          paint: {
+            'line-color': DEFAULTS.line.color,
+            'line-width': DEFAULTS.line.width,
+          },
+        })
+        map.addLayer({
+          id: 'maplink-json-points',
+          type: 'circle',
+          source: 'maplink-json',
+          filter: ['==', '$type', 'Point'],
+          paint: {
+            'circle-radius': 8,
+            'circle-color': DEFAULTS.marker.color,
+            'circle-stroke-color': '#fff',
+            'circle-stroke-width': 2,
+          },
+        })
+      }
+
       // The layers exist now, so sync the panel's initial group filter.
       panel?.applyGroup(initialGroup ?? null)
 
@@ -1277,6 +1548,8 @@ function App() {
           if (!inGroup(rg.group)) continue
           for (const [lng, lat] of rg.pts) extend(lng, lat)
         }
+        // Raw GeoJSON has no group, so it always participates in the fit.
+        for (const f of draw.json) eachCoord(f.geometry, extend)
         if (has) {
           map.fitBounds(bounds, {
             padding: { top: 80, right: 80, bottom: 80, left: panelPaddingLeft },

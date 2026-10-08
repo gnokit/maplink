@@ -39,8 +39,9 @@ data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.
   `popup.remove()`, `map.remove()`). Never add markers inside `map.on('load')` without
   tracking them for cleanup.
 - **Generic arrows in `.tsx`**: `<T>` parses as JSX — write `<T,>`.
-- **No GeoJSON types installed**: use the local `GJFeature` type in `src/App.tsx`;
-  don't reference the `GeoJSON` namespace.
+- **No GeoJSON types installed**: use the local `GJFeature` type for the shared source and
+  `JsonGeometry` / `JsonFeature` for `?json=` in `src/App.tsx`; don't reference the
+  `GeoJSON` namespace.
 - **Basemap warnings are cosmetic**: OpenFreeMap `liberty` + this maplibre version logs
   `highway-shield filter` / missing-sprite-image warnings. They affect basemap icons
   only, never markers. Default style is `bright`.
@@ -57,6 +58,12 @@ data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.
 - Drawable field aliases live in `fieldAliases` in `src/maplink.schema.json` and are
   normalised to canonical names in `parseKV` (`src/App.tsx`). Add a field to the schema,
   the alias map and the README together.
+- `json` (`?json=`) is an additive raw GeoJSON passthrough, **not** a drawable: it skips
+  `parseKV`/`fieldAliases`, has no panel/group/popup integration, and renders from its own
+  `maplink-json` source with fixed-paint layers (`maplink-json-*`). It is validated and
+  bounded in `parseJson` (`MAX_JSON_CHARS`, `MAX_PER_TYPE`, `MAX_JSON_POINTS`), counts as a
+  URL drawable (suppresses the demo) and feeds `autoFit`. Bump the caps and the schema's
+  `maxJsonChars` together.
 - The production host is hard-coded in `index.html`, `public/robots.txt`,
   `public/sitemap.xml` and `scripts/og-card.html` (`maplink-five.vercel.app`). Update all
   four together if the domain changes; regenerate `public/og.png` from
