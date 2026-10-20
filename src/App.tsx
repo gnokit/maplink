@@ -1623,15 +1623,28 @@ function App() {
               routeGeom[i] = { group: r.group, pts: coords }
               if (!r.subtitle && !r.body) panel?.setRowSubtitle(`r-${i}`, metrics)
               anyResolved = true
-              applyFeatures()
               // Turn-by-turn instructions, when the URL asked for them.
               if (r.steps) {
                 const steps = parseRouteSteps(route.legs ?? [])
                 if (steps.length > 0) {
                   panel?.setRouteSteps(`r-${i}`, steps)
+                  if (!panel) {
+                    // Without a panel there is nowhere to list the steps, so
+                    // they go into the route's popup instead.
+                    const list = steps
+                      .map(
+                        (s) =>
+                          `${s.n}. ${s.text}${s.distance > 0 ? ` · ${fmtDistance(s.distance)}` : ''}`,
+                      )
+                      .join('\n')
+                    f.properties.body = f.properties.body
+                      ? `${f.properties.body}\n${list}`
+                      : list
+                  }
                   addStepFeatures(steps)
                 }
               }
+              applyFeatures()
             },
           )
           .catch((err: unknown) => {

@@ -328,6 +328,9 @@ while the manoeuvres are numbered on the map:
 ?route=from:22.2939,114.1694|to:22.3120,114.1790|profile:walk|steps:1|title:步行去愛民邨
 ```
 
+If the link has **no panel** (no `title` and no `group` on any drawable), the
+instructions go into the route's popup instead, so they are never lost.
+
 > Max **10 routes** per link — each visitor pays one routing request, so don't
 > link-bomb the router. No network → straight-line fallback.
 

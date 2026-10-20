@@ -215,7 +215,7 @@
         { "key": "to", "type": "lat,lng", "required": true, "notes": "Route destination." },
         { "key": "via", "type": "lat,lng list", "notes": "Semicolon-separated lat,lng intermediate stops, visited in order." },
         { "key": "profile", "type": "enum", "default": "drive", "enum": ["drive", "walk", "bike"], "notes": "Also accepts car/foot/bicycle/bicycle aliases." },
-        { "key": "steps", "type": "0 | 1", "default": 0, "notes": "Request turn-by-turn steps. The panel row then expands into a numbered instruction list, and the manoeuvres are numbered on the map." },
+        { "key": "steps", "type": "0 | 1", "default": 0, "notes": "Request turn-by-turn steps. The panel row then expands into a numbered instruction list, and the manoeuvres are numbered on the map. Without a panel the instructions go into the route's popup." },
         { "key": "color", "type": "CSS color", "default": "#0284c7" },
         { "key": "width", "type": "number", "default": 5, "notes": "Line width in pixels." },
         { "key": "opacity", "type": "number 0-1", "default": 1 },
