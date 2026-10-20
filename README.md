@@ -55,10 +55,15 @@ string to append to that URL.
 ## ✨ Why it's nice
 
 - **Link = state.** Reload, bookmark, share or embed it — the map comes back identical.
+- **Sharing built in.** `share=1` adds a copy-link button, a QR code, a native
+  share sheet and an `<iframe>` snippet; `embed=1` renders the map chrome-free.
 - **Nothing to host.** No backend, no API key. Basemaps come from [OpenFreeMap](https://openfreemap.org/) vector tiles.
 - **Real street routes.** `route=` resolves driving / walking / cycling routes at
   view time via [routing.openstreetmap.de](https://routing.openstreetmap.de/) — free, no key.
-- **One file of logic.** The entire map lives in [`src/App.tsx`](src/App.tsx).
+  Add `steps:1` for turn-by-turn instructions.
+- **One file of logic.** The entire map lives in [`src/App.tsx`](src/App.tsx)
+  (the share popover is the one exception: [`src/share.ts`](src/share.ts), loaded
+  lazily so links without `share=1` never download it).
 - **It scales.** Past 50 markers, DOM pins automatically upgrade to a GPU `circle` layer.
 
 ## 🚀 Run it
@@ -107,13 +112,15 @@ spellings are accepted; AI agents should prefer the short form.
 | | | `to` | `i` |
 | | | `via` | `v` |
 | | | `profile` | `h` |
+| | | `steps` | `j` |
 
 ```text
 ?m=a:22.315203|o:114.181846|l:30|e:🏢|c:2563eb|t:何文田停車場|g:停車場|b:空位 30
 ```
 
-Top-level params (`m`, `popup`, `line`, `area`, `circle`, `route`, `title`, `panel`, `group`,
-`center`, `zoom`, `style`) are unchanged.
+Top-level params (`m`, `popup`, `line`, `area`, `circle`, `route`, `json`, `title`,
+`panel`, `group`, `center`, `zoom`, `style`, `share`, `embed`, `labels`, `cluster`)
+are unchanged.
 
 ### Viewport
 
@@ -129,6 +136,46 @@ center={lat}|{lng}   zoom={0–22}   style={bright|positron|liberty}
 
 If drawables exist and no `center` / `zoom` is given, the map **auto-fits
 everything**.
+
+### Chrome (share & embed)
+
+```text
+share={0|1}   embed={0|1}   labels={0|1}   cluster={0|1}
+```
+
+| Param | Meaning | Default |
+| --- | --- | --- |
+| `share` | Show the **share control** | `0` (off) |
+| `embed` | Chrome-free mode for iframes | `0` (off) |
+| `labels` | Draw marker labels in GPU mode | `1` (on) |
+| `cluster` | Cluster the GPU point layer | `0` (off) |
+
+**`share=1`** adds a small button in the top-right control stack. It opens a
+popover with:
+
+- **連結** — the current URL, with a copy button.
+- **複製目前視角連結** — the same link with the live `center` / `zoom` baked in
+  (the URL never changes on its own, so this is how you share exactly what you
+  are looking at).
+- **分享…** — the native share sheet, where the browser has one.
+- **QR** — the link as a QR code, plus a PNG download.
+- **嵌入碼** — an `<iframe>` snippet that embeds this map.
+
+**`embed=1`** is the chrome-free mode meant for `<iframe>` embedding: no
+panel, no panel toggle, no share control — the map fills the frame. The map
+attribution stays (OpenStreetMap / OpenFreeMap require it).
+
+```html
+<iframe src="https://maplink.app/?embed=1&m=lat:22.315203|lng:114.181846|title:何文田停車場"
+        width="100%" height="480" style="border:0" loading="lazy"></iframe>
+```
+
+**`labels=0`** turns off the GPU-mode marker labels (see
+[Markers](#1-markers--m-alias-pin-marker)). **`cluster=1`** clusters the GPU
+point layer; clicking a cluster zooms into it.
+
+Every one of these is opt-in (or additive), so a link that does not use them
+renders exactly as it always did.
 
 ### Panel
 
@@ -179,7 +226,18 @@ m=lat:{}|lng:{}|label:{}|emoji:{}|color:{}|scale:{}|anchor:{}|offset:{x},{y}|rot
 | `drag` | `0` / `1` | `0` | let the user drag the pin |
 | `title` `body` | text | — | click-popup content (`\n` → line break) |
 
-> Over **50 markers** renders as a GPU `circle` layer instead of DOM pins.
+> Over **50 markers** renders as a GPU `circle` layer instead of DOM pins. In
+> that mode the marker `label` is drawn as text next to each dot (`labels=0`
+> turns that off), and `emoji` is dropped — the map fonts have no emoji
+> glyphs, so emoji markers only work as DOM pins. Add `cluster=1` to group
+> dense points into clickable clusters.
+
+**Sixty labelled markers, clustered:**
+
+```text
+?cluster=1&m=lat:22.3059|lng:114.1535|label:1|group:甲|title:第一站
+&m=lat:22.3320|lng:114.1465|label:2|group:乙|title:第二站
+```
 
 **Two parking markers:**
 
@@ -242,7 +300,7 @@ line stays and a console warning explains why.
 
 ```text
 route=from:{lat},{lng}|to:{lat},{lng}[|via:{lat},{lng};…]|profile:{drive|walk|bike}
-     |color:{}|width:{}|opacity:{}|title:{}|body:{}|group:{}|subtitle:{}
+     |steps:{0|1}|color:{}|width:{}|opacity:{}|title:{}|body:{}|group:{}|subtitle:{}
 ```
 
 | Key | Type | Default | Notes |
@@ -250,6 +308,7 @@ route=from:{lat},{lng}|to:{lat},{lng}[|via:{lat},{lng};…]|profile:{drive|walk|
 | `from` `to` | `lat,lng` | — | required, route origin / destination |
 | `via` | `lat,lng` list | — | `;`-separated intermediate stops, visited in order |
 | `profile` | enum | `drive` | `drive` / `walk` / `bike` (also `car`, `foot`, `bicycle`) |
+| `steps` | `0` / `1` | `0` | ask the router for turn-by-turn steps |
 | `color` | CSS color | `#0284c7` | |
 | `width` | number | `5` | line width in px |
 | `opacity` | `0`–`1` | `1` | |
@@ -259,6 +318,14 @@ route=from:{lat},{lng}|to:{lat},{lng}[|via:{lat},{lng};…]|profile:{drive|walk|
 
 ```text
 ?route=from:22.2939,114.1694|via:22.3080,114.1740|to:22.3120,114.1790|profile:drive|title:駕車去愛民邨
+```
+
+**Turn-by-turn directions** — add `steps:1` and the panel row expands into a
+numbered instruction list (`1 右轉進入 梳士巴利道 Salisbury Road · 26 米`),
+while the manoeuvres are numbered on the map:
+
+```text
+?route=from:22.2939,114.1694|to:22.3120,114.1790|profile:walk|steps:1|title:步行去愛民邨
 ```
 
 > Max **10 routes** per link — each visitor pays one routing request, so don't
@@ -366,6 +433,21 @@ validated and added as its own `maplink-json` source with fixed-paint layers,
 bypassing the drawable grammar, panel and group filtering. It is included in the
 auto-fit bounds like any other drawable.
 
+Past 50 markers the DOM pins are replaced by a GPU `circle` layer plus an
+optional text layer for the marker `label`; `cluster=1` turns that source into
+MapLibre's built-in clustering (cluster features carry no `group`, so selecting
+a category chip dissolves the clusters and filters the points instead).
+
+`route` can also ask the router for turn-by-turn steps (`steps:1`): the
+response's `legs[].steps[]` become a numbered instruction list in the panel
+and numbered markers on the map. The instruction text is composed from the
+router's `maneuver.type` / `modifier` / street name and inserted as text —
+never as HTML.
+
+The share control lives in `src/share.ts` and is imported dynamically, so it
+(and the QR encoder it pulls in) is only fetched by links that ask for it with
+`share=1`.
+
 The URL grammar and every default live in **`src/maplink.schema.json`**, imported by
 `src/App.tsx` via `src/schema.ts` so code and docs share one source of truth.
 
@@ -391,6 +473,7 @@ also runs automatically before `npm run dev` and `npm run build`.
 
 - **React 19** + **TypeScript** + **Vite 8**
 - **`maplibre-gl` v6** — worker bundled via a `?url` import + `setWorkerUrl`
+- **`qrcode-generator`** — client-side QR codes for the share popover (lazy chunk)
 - **OpenFreeMap** vector tiles — no API key
 - **Vercel** — static deploy; `vercel.json` rewrites app paths to `index.html`
   (excluding `/assets/*` and `/.well-known/*`, so missing files 404 properly)

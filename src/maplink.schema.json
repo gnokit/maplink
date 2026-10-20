@@ -55,7 +55,8 @@
     "from": "x",
     "to": "i",
     "via": "v",
-    "profile": "h"
+    "profile": "h",
+    "steps": "j"
   },
   "enums": {
     "style": ["bright", "positron", "liberty"],
@@ -107,6 +108,28 @@
     },
     "autoFit": "If any drawables exist and neither center nor zoom is given, the map fits all of them."
   },
+  "chrome": {
+    "share": {
+      "syntax": "share={0|1}",
+      "default": 0,
+      "notes": "Show the share control: copy the link, copy the current view, a QR code and an <iframe> embed snippet."
+    },
+    "embed": {
+      "syntax": "embed={0|1}",
+      "default": 0,
+      "notes": "Chrome-free mode for iframes: no panel, no panel toggle, no share control. The map attribution stays."
+    },
+    "labels": {
+      "syntax": "labels={0|1}",
+      "default": 1,
+      "notes": "Draw marker labels in GPU mode (past the DOM marker limit). Emoji is DOM-only."
+    },
+    "cluster": {
+      "syntax": "cluster={0|1}",
+      "default": 0,
+      "notes": "Cluster the GPU point layer. Clicking a cluster zooms into it."
+    }
+  },
   "panel": {
     "description": "Optional left overlay panel listing every drawable. Appears when any drawable has a title or group.",
     "title": { "syntax": "title={text}", "notes": "Panel heading." },
@@ -141,7 +164,7 @@
         { "key": "group", "type": "string", "notes": "Category for panel chips/legend." },
         { "key": "subtitle", "type": "string", "notes": "Second panel-list line; defaults to first body line." }
       ],
-      "notes": "Over the DOM marker limit, renders as a GPU circle layer instead of DOM pins (see domMarkerLimit)."
+      "notes": "Over the DOM marker limit, renders as a GPU circle layer instead of DOM pins (see domMarkerLimit). In GPU mode the label is drawn as text next to the dot; emoji has no glyphs in the map fonts, so emoji markers stay DOM-only."
     },
     {
       "id": "popup",
@@ -192,6 +215,7 @@
         { "key": "to", "type": "lat,lng", "required": true, "notes": "Route destination." },
         { "key": "via", "type": "lat,lng list", "notes": "Semicolon-separated lat,lng intermediate stops, visited in order." },
         { "key": "profile", "type": "enum", "default": "drive", "enum": ["drive", "walk", "bike"], "notes": "Also accepts car/foot/bicycle/bicycle aliases." },
+        { "key": "steps", "type": "0 | 1", "default": 0, "notes": "Request turn-by-turn steps. The panel row then expands into a numbered instruction list, and the manoeuvres are numbered on the map." },
         { "key": "color", "type": "CSS color", "default": "#0284c7" },
         { "key": "width", "type": "number", "default": 5, "notes": "Line width in pixels." },
         { "key": "opacity", "type": "number 0-1", "default": 1 },
@@ -200,7 +224,7 @@
         { "key": "group", "type": "string", "notes": "Category for panel chips/legend." },
         { "key": "subtitle", "type": "string", "notes": "Second panel-list line; defaults to distance·duration once resolved." }
       ],
-      "notes": "Max 10 routes per URL (each costs the visitor one routing request). Requires network; offline links degrade to straight lines."
+      "notes": "Max 10 routes per URL (each costs the visitor one routing request). Requires network; offline links degrade to straight lines. Add steps:1 for turn-by-turn instructions."
     },
     {
       "id": "area",

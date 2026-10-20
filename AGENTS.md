@@ -45,6 +45,23 @@ data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.
 - **Basemap warnings are cosmetic**: OpenFreeMap `liberty` + this maplibre version logs
   `highway-shield filter` / missing-sprite-image warnings. They affect basemap icons
   only, never markers. Default style is `bright`.
+- **GL text layers need an explicit font**: the OpenFreeMap font host serves
+  `Noto Sans Regular` / `Bold` / `Italic` (CJK included) but **not** MapLibre's default
+  stack (`Open Sans Regular`) and **not** emoji. Any symbol layer must set
+  `text-font: ['Noto Sans Regular']` or it renders nothing; emoji markers only work as
+  DOM pins.
+- **Clusters carry no `group`**: MapLibre's cluster features have no original properties,
+  so a category filter can't be applied to them. `cluster=1` therefore dissolves the
+  clusters (`setClusterOptions({cluster:false})`) while a chip is selected and rebuilds
+  them for 全部. The point layers keep the `['!', ['has','point_count']]` filter so
+  clusters never render as points.
+- **The share popover lives in `src/share.ts`** (the one module outside `App.tsx`) and is
+  imported with `await import('./share')` so links without `share=1` never download it —
+  or the QR encoder. Its `IControl.onRemove` must detach the document-level
+  pointerdown/Esc listeners; `map.remove()` does call `onRemove` for every control.
+- **`qrcode-generator` is CJS-typed** (`export =`) but ships an ESM build with a default
+  export. `src/share.ts` normalises both shapes after the dynamic import — don't
+  "simplify" it to a plain default import.
 
 ## Conventions
 
@@ -68,3 +85,9 @@ data API. Spec: `README.md`. Everything map-related lives in `src/App.tsx`.
   `public/sitemap.xml` and `scripts/og-card.html` (`maplink-five.vercel.app`). Update all
   four together if the domain changes; regenerate `public/og.png` from
   `scripts/og-card.html` with headless Chrome.
+- **New URL params are opt-in by default**: `share`, `embed` and `cluster` default to
+  `0`, `labels` defaults to `1` (additive — it only restores text the GPU path used to
+  drop). A link that predates a param must keep rendering the way it did, so add the
+  param to `parseDrawables`, `src/maplink.schema.json` (the `chrome` block) and the
+  README together. `scripts/gen-agent-docs.mjs` renders the `chrome` block into
+  `llms.txt` automatically.

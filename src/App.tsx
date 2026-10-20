@@ -33,6 +33,10 @@ maplibregl.setWorkerUrl(maplibreWorkerUrl)
 //     paint; no panel row, no group filtering, no popup.
 //   center={lat}|{lng}  zoom={n}  style={bright|positron|liberty}
 //   title={panel heading}  panel={0|1}  group={initial chip}
+//   share={0|1}  — show the share control (copy link, QR, embed snippet)
+//   embed={0|1}  — chrome-free mode for iframes (no panel, no share control)
+//   labels={0|1} — draw marker labels in GPU mode (default 1)
+//   cluster={0|1}— cluster the GPU point layer (default 0)
 // Drawable fields also accept one-letter aliases (lat→a, lng→o, color→c, …) and
 // hex colours may omit '#' (c:2563eb). See FIELD_ALIAS + README "Short field names".
 // All drawable params are repeatable. Only listed keys are read, malformed
@@ -51,6 +55,12 @@ const MAX_ROUTES = 10
 // its total coordinate count (feature count reuses MAX_PER_TYPE).
 const MAX_JSON_CHARS = 200_000
 const MAX_JSON_POINTS = 20_000
+// Clustering of the GPU point layer (only when `cluster=1`).
+const CLUSTER_RADIUS = 50
+const CLUSTER_MAX_ZOOM = 14
+// The OpenFreeMap styles ship "Noto Sans Regular"; MapLibre's default font
+// stack is not served by that host, so a text layer must name it explicitly.
+const LABEL_FONT = ['Noto Sans Regular']
 
 type DrawMarker = {
   lat: number
@@ -143,6 +153,18 @@ type DrawRoute = {
   body?: string
   group?: string
   subtitle?: string
+  steps?: boolean
+}
+
+// One turn-by-turn instruction, resolved from the OSRM `steps=true` response.
+type RouteStep = {
+  n: number
+  text: string
+  distance: number
+  lng?: number
+  lat?: number
+  /** Turn-type maneuvers get a numbered marker on the map. */
+  marker: boolean
 }
 
 type GJFeature = {
@@ -362,7 +384,116 @@ function parseRoute(item: string): DrawRoute | undefined {
   if (kv.body) r.body = kv.body
   if (kv.group) r.group = kv.group
   if (kv.subtitle) r.subtitle = kv.subtitle
+  if (kv.steps === '1' || kv.steps === 'true') r.steps = true
   return r
+}
+
+// ---------------------------------------------------------------------------
+// Turn-by-turn instructions (OSRM `steps=true`)
+// ---------------------------------------------------------------------------
+
+// OSRM's maneuver modifiers → Chinese. The panel UI is Chinese; street names
+// keep whatever OSM returns (they are already localised).
+const STEP_MODIFIER_ZH: Record<string, string> = {
+  left: '左轉',
+  right: '右轉',
+  'slight left': '稍向左轉',
+  'sharp left': '急左轉',
+  straight: '直行',
+  'slight right': '稍向右轉',
+  'sharp right': '急右轉',
+  uturn: '回頭',
+}
+
+const STEP_TYPE_ZH: Record<string, string> = {
+  depart: '出發',
+  arrive: '抵達',
+  turn: '轉彎',
+  'new name': '轉入新路',
+  continue: '沿路直行',
+  merge: '匯入',
+  fork: '選擇行車線',
+  roundabout: '繞行',
+  rotary: '繞行',
+  'exit roundabout': '駛出圓環',
+  'exit rotary': '駛出圓環',
+  'on ramp': '上匝道',
+  'off ramp': '下匝道',
+  'end of road': '道路盡頭',
+  'use lane': '使用車道',
+}
+
+// Manoeuvers that deserve a numbered marker on the map (a "depart" or a plain
+// "continue" is not worth a pin).
+const STEP_MARKER_TYPES = new Set([
+  'turn',
+  'new name',
+  'arrive',
+  'merge',
+  'fork',
+  'roundabout',
+  'rotary',
+  'exit roundabout',
+  'exit rotary',
+  'on ramp',
+  'off ramp',
+  'end of road',
+])
+
+// Compose one instruction from the OSRM fields. The street name comes from a
+// remote service, so it is treated as untrusted text (never HTML).
+function stepInstruction(type: string, modifier?: string, name?: string): string {
+  const street = (name ?? '').trim()
+  const mod = STEP_MODIFIER_ZH[(modifier ?? '').toLowerCase()] ?? ''
+  const t = type.toLowerCase()
+  if (t === 'depart') return street ? `出發 · ${street}` : '出發'
+  if (t === 'arrive') return street ? `抵達 ${street}` : '抵達'
+  if (t === 'turn' || t === 'new name') {
+    if (mod && street) return `${mod}進入 ${street}`
+    if (mod) return mod
+    return street ? `進入 ${street}` : '轉彎'
+  }
+  if (t === 'continue') {
+    if (street) return `沿 ${street} 直行`
+    return mod || '沿路直行'
+  }
+  const base = STEP_TYPE_ZH[t] ?? '直行'
+  if (street) return `${base} · ${street}`
+  return mod || base
+}
+
+type OsrmStep = {
+  distance?: number
+  name?: string
+  maneuver?: { type?: string; modifier?: string; location?: [number, number] }
+}
+
+type OsrmLeg = { steps?: OsrmStep[] }
+
+// Flatten the legs into one numbered instruction list. Intermediate legs end
+// with an "arrive" step at the via point and the next leg starts with a
+// "depart" — the pair is dropped so the list reads continuously.
+function parseRouteSteps(legs: OsrmLeg[]): RouteStep[] {
+  const out: RouteStep[] = []
+  legs.forEach((leg, legIdx) => {
+    const steps = leg.steps ?? []
+    steps.forEach((s) => {
+      const type = (s.maneuver?.type ?? '').toLowerCase()
+      const isLastLeg = legIdx === legs.length - 1
+      if (type === 'arrive' && !isLastLeg) return
+      if (type === 'depart' && legIdx > 0) return
+      const loc = s.maneuver?.location
+      out.push({
+        n: out.length + 1,
+        text: stepInstruction(type, s.maneuver?.modifier, s.name),
+        distance: typeof s.distance === 'number' ? s.distance : 0,
+        lng: loc?.[0],
+        lat: loc?.[1],
+        marker: STEP_MARKER_TYPES.has(type),
+      })
+    })
+  })
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -574,6 +705,14 @@ type DrawableSet = {
   hasPanel: boolean
   panelOpen: boolean
   initialGroup?: string
+  /** Show the share control (copy link, QR, embed snippet). */
+  share: boolean
+  /** Chrome-free mode for iframes: no panel, no share control. */
+  embed: boolean
+  /** Draw marker labels in GPU mode. */
+  labels: boolean
+  /** Cluster the GPU point layer. */
+  cluster: boolean
 }
 
 // Demo content shown when the URL carries no drawables. It exercises the three
@@ -706,6 +845,13 @@ function parseDrawables(search: string): DrawableSet {
   const hasPanel = hasTitles || panelParam === '1'
   const panelOpen = panelParam === '1' ? true : panelParam === '0' ? false : hasTitles
 
+  // Chrome / rendering switches. Every one of them is opt-in or additive, so a
+  // link that predates them renders exactly as it did before.
+  const share = params.get('share') === '1' || params.get('share') === 'true'
+  const embed = params.get('embed') === '1' || params.get('embed') === 'true'
+  const labels = params.get('labels') !== '0' && params.get('labels') !== 'false'
+  const cluster = params.get('cluster') === '1' || params.get('cluster') === 'true'
+
   return {
     markers: drawables.markers,
     popups: drawables.popups,
@@ -721,6 +867,10 @@ function parseDrawables(search: string): DrawableSet {
     hasPanel,
     panelOpen,
     initialGroup,
+    share,
+    embed,
+    labels,
+    cluster,
   }
 }
 
@@ -750,6 +900,8 @@ function circleRing(lng: number, lat: number, radiusM: number, steps = 64): Arra
 
 // OSRM instance + endpoint profile for a parsed route, against OSM's public
 // routers: free, no key. Per-request path segment matches the loaded profile.
+// `steps=true` is only requested when the URL asks for turn-by-turn
+// instructions, so the default request is unchanged.
 function routeUrl(r: DrawRoute): string {
   const [instance, path] =
     r.profile === 'walk'
@@ -761,7 +913,8 @@ function routeUrl(r: DrawRoute): string {
     .slice(0, MAX_POINTS)
     .map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`)
     .join(';')
-  return `https://routing.openstreetmap.de/${instance}/route/v1/${path}/${coords}?overview=full&geometries=geojson&alternatives=false&steps=false`
+  const steps = r.steps ? '&steps=true' : '&steps=false'
+  return `https://routing.openstreetmap.de/${instance}/route/v1/${path}/${coords}?overview=full&geometries=geojson&alternatives=false${steps}`
 }
 
 function fmtDistance(m: number): string {
@@ -781,6 +934,27 @@ function escapeHtml(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+// Rewrite one top-level param in a query string. The raw string is edited
+// instead of going through URLSearchParams, which would re-encode the `|`,
+// `;` and `:` separators of the grammar and make the shared link unreadable.
+function withParam(search: string, key: string, value?: string): string {
+  const parts = search.replace(/^\?/, '').split('&').filter((p) => p.length > 0)
+  const out: string[] = []
+  let written = false
+  for (const part of parts) {
+    if (part.split('=')[0] !== key) {
+      out.push(part)
+      continue
+    }
+    if (value !== undefined && !written) {
+      out.push(`${key}=${encodeURIComponent(value)}`)
+      written = true
+    }
+  }
+  if (value !== undefined && !written) out.push(`${key}=${encodeURIComponent(value)}`)
+  return out.length > 0 ? `?${out.join('&')}` : ''
 }
 
 function popupHtml(title?: string, body?: string, icon?: string): string {
@@ -956,7 +1130,11 @@ function buildPanel(opts: {
   markerEls: Groupable[]
   popupEls: Groupable[]
   open: boolean
-}): { root: HTMLElement; applyGroup: (g: string | null) => void; setRowSubtitle: (key: string, text: string) => void; destroy: () => void } {
+  /** The GPU point layer is clustered — cluster features have no `group`. */
+  cluster?: boolean
+  /** Called whenever the selected category changes (including 全部). */
+  onGroupChange?: (g: string | null) => void
+}): { root: HTMLElement; applyGroup: (g: string | null) => void; setRowSubtitle: (key: string, text: string) => void; setRouteSteps: (key: string, steps: RouteStep[]) => void; destroy: () => void } {
   const { map } = opts
 
   const root = document.createElement('div')
@@ -1008,6 +1186,7 @@ function buildPanel(opts: {
   const list = document.createElement('ul')
   list.className = 'maplink-panel__list'
   const rows: Array<{ li: HTMLLIElement; item: PanelItem }> = []
+  const rowByKey = new Map<string, HTMLLIElement>()
   for (const it of opts.items) {
     const li = document.createElement('li')
     const btn = document.createElement('button')
@@ -1045,6 +1224,7 @@ function buildPanel(opts: {
     li.appendChild(btn)
     list.appendChild(li)
     rows.push({ li, item: it })
+    rowByKey.set(it.key, li)
   }
   panel.appendChild(list)
 
@@ -1112,8 +1292,23 @@ function buildPanel(opts: {
       map.setFilter('maplink-area-outline', withGroup(['==', '$type', 'Polygon']))
     if (map.getLayer('maplink-line'))
       map.setFilter('maplink-line', withGroup(['==', '$type', 'LineString']))
-    if (map.getLayer('maplink-points'))
-      map.setFilter('maplink-points', g === null ? null : (['==', ['get', 'group'], g] as unknown as MapFilter))
+    // GPU point layer (+ its label layer). When the layer is clustered, the
+    // cluster features must stay out of the point layer — they are drawn by
+    // their own layers.
+    const notCluster: MapFilter = ['!', ['has', 'point_count']] as unknown as MapFilter
+    const byGroup: MapFilter = ['==', ['get', 'group'], g] as unknown as MapFilter
+    const pointFilter: MapFilter | null =
+      g === null
+        ? opts.cluster
+          ? notCluster
+          : null
+        : opts.cluster
+          ? (['all', notCluster, byGroup] as unknown as MapFilter)
+          : byGroup
+    for (const id of ['maplink-points', 'maplink-points-label']) {
+      if (map.getLayer(id)) map.setFilter(id, pointFilter)
+    }
+    opts.onGroupChange?.(g)
   }
 
   function setGroup(g: string | null) {
@@ -1150,6 +1345,41 @@ function buildPanel(opts: {
       }
       sub.textContent = text
     },
+    // Turn-by-turn instructions land with the route response; add them as a
+    // collapsible list under the route's row.
+    setRouteSteps(key, steps) {
+      const row = rowByKey.get(key)
+      if (!row || steps.length === 0) return
+      if (row.querySelector('.maplink-steps')) return
+      const details = document.createElement('details')
+      details.className = 'maplink-steps'
+      const summary = document.createElement('summary')
+      summary.className = 'maplink-steps__summary'
+      summary.textContent = `步驟 (${steps.length})`
+      const ol = document.createElement('ol')
+      ol.className = 'maplink-steps__list'
+      for (const s of steps) {
+        const item = document.createElement('li')
+        item.className = 'maplink-steps__item'
+        const n = document.createElement('span')
+        n.className = 'maplink-steps__n'
+        n.textContent = String(s.n)
+        const text = document.createElement('span')
+        text.className = 'maplink-steps__text'
+        // Street names come from the router — plain text, never HTML.
+        text.textContent = s.text
+        item.append(n, text)
+        if (s.distance > 0) {
+          const dist = document.createElement('span')
+          dist.className = 'maplink-steps__dist'
+          dist.textContent = fmtDistance(s.distance)
+          item.appendChild(dist)
+        }
+        ol.appendChild(item)
+      }
+      details.append(summary, ol)
+      row.appendChild(details)
+    },
     destroy() {
       if (focusPopup) focusPopup.remove()
       root.remove()
@@ -1174,6 +1404,43 @@ function App() {
       zoom: draw.zoom ?? DEFAULT_ZOOM,
     })
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
+
+    // Share control (opt-in with `share=1`). The module is imported lazily, so
+    // a link without `share=1` never downloads it.
+    let disposed = false
+    if (draw.share && !draw.embed) {
+      void import('./share')
+        .then(({ createShareControl }) => {
+          if (disposed) return
+          const origin = window.location.origin
+          const pathname = window.location.pathname
+          const currentUrl = () => `${origin}${pathname}${window.location.search}`
+          const viewUrl = () => {
+            const c = map.getCenter()
+            const search = withParam(
+              withParam(
+                window.location.search,
+                'center',
+                `${c.lat.toFixed(5)}|${c.lng.toFixed(5)}`,
+              ),
+              'zoom',
+              map.getZoom().toFixed(2),
+            )
+            return `${origin}${pathname}${search}`
+          }
+          const embedUrl = () => {
+            const search = withParam(withParam(window.location.search, 'embed', '1'), 'share')
+            return `${origin}${pathname}${search}`
+          }
+          map.addControl(
+            createShareControl({ url: currentUrl, viewUrl, embedUrl }),
+            'top-right',
+          )
+        })
+        .catch((err: unknown) => {
+          console.warn('maplink: the share control could not be loaded', err)
+        })
+    }
 
     // Markers + standalone popups don't depend on the style — add immediately.
     const usePointsLayer = draw.markers.length > DOM_MARKER_LIMIT
@@ -1223,8 +1490,9 @@ function App() {
     ]
     const initialGroup =
       draw.initialGroup && groups.includes(draw.initialGroup) ? draw.initialGroup : undefined
+    // Embed mode is chrome-free: no panel, no panel toggle, no share control.
     const panel =
-      draw.hasPanel && items.length > 0
+      draw.hasPanel && items.length > 0 && !draw.embed
         ? buildPanel({
             map,
             items,
@@ -1234,6 +1502,21 @@ function App() {
             markerEls,
             popupEls,
             open: draw.panelOpen,
+            cluster: draw.cluster,
+            onGroupChange: (g) => {
+              // Cluster features carry no `group`, so a category filter cannot
+              // be applied to them: dissolve the clusters while a chip is
+              // selected and rebuild them for 全部.
+              const source = map.getSource<maplibregl.GeoJSONSource>('maplink-points')
+              if (!source || !draw.cluster) return
+              void source
+                .setClusterOptions(
+                  g === null
+                    ? { cluster: true, clusterRadius: CLUSTER_RADIUS, clusterMaxZoom: CLUSTER_MAX_ZOOM }
+                    : { cluster: false },
+                )
+                .catch(() => {})
+            },
           })
         : null
     if (panel) overlay.appendChild(panel.root)
@@ -1247,6 +1530,64 @@ function App() {
     // touches them once the responses land.
     let routeGeom: Array<{ group?: string; pts: Array<[number, number]> }> = []
     let autoFit = () => {}
+
+    // Turn-by-turn markers: one numbered dot per manoeuvre. The layer is
+    // created lazily, when the first route with `steps` resolves.
+    type StepFeature = {
+      type: 'Feature'
+      geometry: { type: 'Point'; coordinates: [number, number] }
+      properties: { n: string }
+    }
+    const stepFeatures: StepFeature[] = []
+    function ensureStepsLayer() {
+      if (map.getSource('maplink-steps')) return
+      map.addSource('maplink-steps', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: 'maplink-steps-dot',
+        type: 'circle',
+        source: 'maplink-steps',
+        paint: {
+          'circle-radius': 9,
+          'circle-color': DEFAULTS.route.color,
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#fff',
+        },
+      })
+      map.addLayer({
+        id: 'maplink-steps-num',
+        type: 'symbol',
+        source: 'maplink-steps',
+        layout: {
+          'text-field': ['get', 'n'],
+          'text-font': LABEL_FONT,
+          'text-size': 10,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        paint: { 'text-color': '#ffffff' },
+      })
+    }
+    function addStepFeatures(steps: RouteStep[]) {
+      const added = steps
+        .filter((s) => s.marker && s.lng !== undefined && s.lat !== undefined)
+        .map(
+          (s): StepFeature => ({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [s.lng as number, s.lat as number] },
+            properties: { n: String(s.n) },
+          }),
+        )
+      if (added.length === 0) return
+      ensureStepsLayer()
+      stepFeatures.push(...added)
+      map.getSource<maplibregl.GeoJSONSource>('maplink-steps')?.setData({
+        type: 'FeatureCollection',
+        features: stepFeatures,
+      } as never)
+    }
 
     function resolveRoutes(routes: DrawRoute[], featureIdx: number[], featureList: GJFeature[]) {
       function applyFeatures() {
@@ -1268,6 +1609,7 @@ function App() {
                   distance: number
                   duration: number
                   geometry?: { coordinates?: Array<[number, number]> }
+                  legs?: Array<{ steps?: OsrmStep[] }>
                 }>
               },
             ) => {
@@ -1282,6 +1624,14 @@ function App() {
               if (!r.subtitle && !r.body) panel?.setRowSubtitle(`r-${i}`, metrics)
               anyResolved = true
               applyFeatures()
+              // Turn-by-turn instructions, when the URL asked for them.
+              if (r.steps) {
+                const steps = parseRouteSteps(route.legs ?? [])
+                if (steps.length > 0) {
+                  panel?.setRouteSteps(`r-${i}`, steps)
+                  addStepFeatures(steps)
+                }
+              }
             },
           )
           .catch((err: unknown) => {
@@ -1424,26 +1774,33 @@ function App() {
 
       // >50 markers render as a GL circle layer instead of DOM nodes.
       if (usePointsLayer) {
+        // The label rides along as a property so it can be drawn by a symbol
+        // layer; the DOM pins keep rendering emoji, which a GL text layer
+        // cannot (the font host has no emoji glyphs).
+        const pointFeatures = draw.markers.map((m, i) => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [m.lng, m.lat] as [number, number] },
+          properties: {
+            color: m.color ?? DEFAULTS.marker.color,
+            title: m.title ?? m.label ?? `Marker ${i + 1}`,
+            body: m.body ?? null,
+            group: m.group ?? null,
+            label: m.label ?? null,
+          },
+        }))
         map.addSource('maplink-points', {
           type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: draw.markers.map((m, i) => ({
-              type: 'Feature',
-              geometry: { type: 'Point', coordinates: [m.lng, m.lat] },
-              properties: {
-                color: m.color ?? DEFAULTS.marker.color,
-                title: m.title ?? m.label ?? `Marker ${i + 1}`,
-                body: m.body ?? null,
-                group: m.group ?? null,
-              },
-            })),
-          },
+          data: { type: 'FeatureCollection', features: pointFeatures },
+          cluster: draw.cluster,
+          clusterRadius: CLUSTER_RADIUS,
+          clusterMaxZoom: CLUSTER_MAX_ZOOM,
         })
+        const notCluster: maplibregl.FilterSpecification = ['!', ['has', 'point_count']]
         map.addLayer({
           id: 'maplink-points',
           type: 'circle',
           source: 'maplink-points',
+          ...(draw.cluster ? { filter: notCluster } : {}),
           paint: {
             'circle-radius': 8,
             'circle-color': ['coalesce', ['get', 'color'], DEFAULTS.marker.color],
@@ -1451,6 +1808,76 @@ function App() {
             'circle-stroke-width': 2,
           },
         })
+        // Marker labels (the GPU path used to drop them).
+        if (draw.labels && draw.markers.some((m) => m.label)) {
+          map.addLayer({
+            id: 'maplink-points-label',
+            type: 'symbol',
+            source: 'maplink-points',
+            ...(draw.cluster ? { filter: notCluster } : {}),
+            layout: {
+              'text-field': ['get', 'label'],
+              'text-font': LABEL_FONT,
+              'text-size': 11,
+              'text-allow-overlap': true,
+              'text-ignore-placement': true,
+              'text-anchor': 'top',
+              'text-offset': [0, 0.9],
+            },
+            paint: {
+              'text-color': '#111827',
+              'text-halo-color': '#ffffff',
+              'text-halo-width': 1.5,
+            },
+          })
+        }
+        if (draw.cluster) {
+          map.addLayer({
+            id: 'maplink-clusters',
+            type: 'circle',
+            source: 'maplink-points',
+            filter: ['has', 'point_count'],
+            paint: {
+              'circle-radius': ['step', ['get', 'point_count'], 16, 25, 21, 100, 27],
+              'circle-color': ['step', ['get', 'point_count'], '#2563eb', 25, '#1d4ed8', 100, '#1e3a8a'],
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#fff',
+            },
+          })
+          map.addLayer({
+            id: 'maplink-cluster-count',
+            type: 'symbol',
+            source: 'maplink-points',
+            filter: ['has', 'point_count'],
+            layout: {
+              'text-field': ['get', 'point_count_abbreviated'],
+              'text-font': LABEL_FONT,
+              'text-size': 12,
+              'text-allow-overlap': true,
+              'text-ignore-placement': true,
+            },
+            paint: { 'text-color': '#ffffff' },
+          })
+          map.on('click', 'maplink-clusters', (e) => {
+            const f = e.features?.[0]
+            const clusterId = Number(f?.properties?.cluster_id)
+            const source = map.getSource<maplibregl.GeoJSONSource>('maplink-points')
+            const coords = (f?.geometry as { coordinates?: [number, number] } | undefined)?.coordinates
+            if (!source || !coords || !Number.isFinite(clusterId)) return
+            void source
+              .getClusterExpansionZoom(clusterId)
+              .then((zoom) => {
+                map.easeTo({ center: [coords[0], coords[1]], zoom, duration: 500 })
+              })
+              .catch(() => {})
+          })
+          map.on('mouseenter', 'maplink-clusters', () => {
+            map.getCanvas().style.cursor = 'pointer'
+          })
+          map.on('mouseleave', 'maplink-clusters', () => {
+            map.getCanvas().style.cursor = ''
+          })
+        }
         map.on('click', 'maplink-points', (e) => {
           const f = e.features?.[0]
           if (!f) return
@@ -1564,6 +1991,7 @@ function App() {
     })
 
     return () => {
+      disposed = true
       for (const c of controllers) c.abort()
       panel?.destroy()
       for (const m of markers) m.remove()

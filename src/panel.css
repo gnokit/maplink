@@ -275,3 +275,198 @@
 .maplibregl-ctrl-attrib {
   color: #111827;
 }
+
+/* ---------------------------------------------------------------------------
+   Share control (opt-in with `share=1`).
+
+   The button sits in MapLibre's top-right control stack, so it is styled like
+   the zoom buttons (a white card). The popover is appended to <body> and
+   positioned with fixed coordinates — the map container clips its overflow.
+   --------------------------------------------------------------------------- */
+
+.maplink-share__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+.maplink-share__trigger:hover {
+  background: #f2f2f2;
+}
+
+.maplink-share__pop {
+  position: fixed;
+  z-index: 20;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  padding: 12px;
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+  font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.maplink-share__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.maplink-share__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.maplink-share__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.maplink-share__url,
+.maplink-share__embed {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #111827;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: none;
+}
+
+.maplink-share__url:focus,
+.maplink-share__embed:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: -1px;
+}
+
+.maplink-share__btn,
+.maplink-share__wide {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #f3f4f6;
+  color: #111827;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.maplink-share__btn:hover,
+.maplink-share__wide:hover {
+  background: #e5e7eb;
+}
+
+.maplink-share__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.maplink-share__wide {
+  width: 100%;
+}
+
+.maplink-share__qr {
+  width: 132px;
+  height: 132px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.maplink-share__qrside {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.maplink-share__note {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.maplink-share__toast {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Turn-by-turn steps (the `steps:1` route field).
+   --------------------------------------------------------------------------- */
+
+.maplink-steps {
+  margin: 2px 6px 8px;
+  font-size: 12px;
+}
+
+.maplink-steps__summary {
+  cursor: pointer;
+  color: var(--ml-muted);
+  padding: 2px 0;
+  user-select: none;
+}
+
+.maplink-steps__list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.maplink-steps__item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  color: var(--ml-fg);
+}
+
+.maplink-steps__n {
+  flex: none;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--ml-control-bg);
+  color: var(--ml-control-fg);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 17px;
+}
+
+.maplink-steps__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.maplink-steps__dist {
+  flex: none;
+  color: var(--ml-muted);
+  font-variant-numeric: tabular-nums;
+}

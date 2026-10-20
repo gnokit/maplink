@@ -70,6 +70,12 @@ ${aliasLine}
 - \`zoom={n}\` \u2014 ${zoom.min}\u2013${zoom.max} (default ${zoom.default})
 - \`style\` \u2014 ${schema.enums.style.join(', ')} (default ${schema.defaultStyle})
 
+## Chrome
+
+${Object.entries(schema.chrome)
+  .map(([key, v]) => `- \`${key}\` \u2014 ${v.notes} (default ${v.default})`)
+  .join('\n')}
+
 ## Panel
 
 - \`title={text}\` \u2014 heading for the optional left-hand list of drawables
